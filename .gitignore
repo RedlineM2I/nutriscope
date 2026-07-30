@@ -219,3 +219,6 @@ __marimo__/
 
 # PyCharm
 .idea/
+
+# Data files
+food.parquet
