@@ -75,14 +75,23 @@ def keep_fr_or_default(val):
     return None
 
 
+def extract_nutrients(val):
+    if val is None:
+        return {"salt_100g": None, "energy_100g": None, "sugars_100g": None}
 
-@timer
-def main():
-    table = pq.read_table("food_clean.parquet")
-    df = table.slice(0, 1000).to_pandas()
-    
-    print(df)
+    res = {"salt_100g": None, "energy_100g": None, "sugars_100g": None}
 
+    for item in val:
+        if isinstance(item, dict):
+            name = item.get("name")
+            if name == "salt":
+                res["salt_100g"] = item.get("100g")
+            elif name == "energy":
+                res["energy_100g"] = item.get("100g")
+            elif name == "sugars":
+                res["sugars_100g"] = item.get("100g")
+
+    return res
 
 
 
@@ -91,21 +100,32 @@ def create_compact_parquet():
     lazy = (
         pl.scan_parquet("food.parquet")
         .with_columns(
-            pl.col("countries_tags").cast(pl.List(pl.Utf8), strict=False)
+            pl.col("countries_tags").cast(pl.List(pl.Utf8), strict=False),
         )
         .filter(
             pl.col("countries_tags").list.contains("en:france")
-            # & pl.col("nutriscore_score").is_not_null()
         )
         .with_columns(
             pl.col("product_name")
             .map_elements(keep_fr_or_default, return_dtype=pl.Utf8)
-            .alias("product_name")
+            .alias("product_name"),
+            pl.col("nutriments")
+            .map_elements(extract_nutrients, return_dtype=pl.Struct([
+                pl.Field("salt_100g", pl.Float64),
+                pl.Field("energy_100g", pl.Float64),
+                pl.Field("sugars_100g", pl.Float64),
+            ]))
+            .alias("nutrient_struct"),
         )
+        .unnest("nutrient_struct")
         .select([
             "product_name",
             "countries_tags",
             "nutriscore_score",
+            "nutriments",
+            "salt_100g",
+            "energy_100g",
+            "sugars_100g",
         ])
     )
 
@@ -148,6 +168,15 @@ def top_n_products(n: int = 10):
     print(resultat)
 
 
+
+@timer
+def main():
+    table = pq.read_table("food_clean.parquet")
+    df = table.slice(0, 1000).to_pandas()
+    
+    print(df)
+
+
 @timer
 def main():
     print("Creation d'une version compacte du fichier parquet avec un premier nettoyage et filtrage de données")
@@ -162,6 +191,19 @@ def main():
     print("Récupération du top 10 des produits les plus présents")
     top_n_products(10)
 
+    res = duckdb.sql("SELECT product_name,sugars_100g ,energy_100g,salt_100g from 'food_clean.parquet' order by sugars_100g desc limit 1000;")
+
+    rows_len = duckdb.sql("""select count(*) from 'food_clean.parquet'""").fetchone()[0]
+    sugars_100g_rows_len = duckdb.sql("""select count(*) from 'food_clean.parquet' where sugars_100g is null""").fetchone()[0]
+    energy_100g_len = duckdb.sql("""select count(*) from 'food_clean.parquet' where energy_100g is null""").fetchone()[0]
+    salt_100g_len = duckdb.sql("""select count(*) from 'food_clean.parquet' where salt_100g is null""").fetchone()[0]
+
+    print("Taux de manquants sur les nutriments")
+    print(f"Sucres : {(sugars_100g_rows_len / rows_len) * 100} %")
+    print(f"Energy : {(energy_100g_len / rows_len) * 100} %")
+    print(f"Sel : {(salt_100g_len / rows_len) * 100} %")
+
+    # Dernier temps de traitements : 128.478 secondes
 
 
 if __name__=="__main__":
