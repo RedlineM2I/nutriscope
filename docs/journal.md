@@ -14,7 +14,7 @@ et donc un gain de temps et de ressources important
 - Typages intégrés
 - Beaucoup plus compact qu'un csv pour le même nombre de données
 
-Ce fichier fait *7.5 GO* de mémoire
+Ce fichier fait **7.5 GO** de mémoire
 
 > Date de l'export : 29/07/26
 
