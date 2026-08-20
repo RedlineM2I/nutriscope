@@ -18,6 +18,11 @@ Ce fichier fait **7.5 GO** de mémoire
 
 > Date de l'export : 29/07/26
 
+Pour télécharger le jeu de données (fichier parquet):
+````bash
+python ../src/data/fetch_data.py
+````
+
 ## Questions :
 
 #### Combien de produits vendus en France ?
