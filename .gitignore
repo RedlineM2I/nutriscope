@@ -221,4 +221,4 @@ __marimo__/
 .idea/
 
 # Data files
-food.parquet
+*.parquet
