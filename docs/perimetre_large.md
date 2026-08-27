@@ -24,12 +24,12 @@ nutrition_data_per : valeurs nutritionnelles par portion ou 100g ; VARCHAR
 
 #### Classification
 
-brands_tags : marques ; VARCHAR[]
-categories_tags : cat des produits ; VARCHAR[]
-labels_tags ; VARCHAR[]
-origins_tags ; VARCHAR[]
+brands_tags : marques ; VARCHAR[] ; 90541
+categories_tags : cat des produits ; VARCHAR[] ; 38236
+labels_tags ; VARCHAR[] ; 14002
+origins_tags ; VARCHAR[] ; 9497
 ? manufacturing_places_tags ; VARCHAR[]
-countries_tags : selection des pays (que en tags) ; VARCHAR[]
+countries_tags : selection des pays (que en tags) ; VARCHAR[] ; 248
 
 #### Ingrédients
 
