@@ -51,3 +51,13 @@ COLUMNS = [
     # Images
     "images",
 ]
+
+CATEGORIES = [
+    "en:snacks",
+    "en:beverages",
+    "en:meats",
+    "en:fruits-and-vegetables-based-foods",
+    "en:cheeses",
+    "en:fishes",
+    "en:desserts"
+]
