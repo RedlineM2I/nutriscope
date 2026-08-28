@@ -1,0 +1,17 @@
+name: Vérification branche source
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier que la PR vient de develop
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "❌ Seule la branche 'develop' peut être mergée dans 'main' (source actuelle : ${{ github.head_ref }})"
+            exit 1
+          fi
+          echo "✅ Source valide : develop"
