@@ -48,10 +48,9 @@ l'intérieur (voir la vue `products` dans le notebook).
 
 | Colonne | Type | À quoi ça sert |
 |---|---|---|
-| `nutriments` | STRUCT(...)[] | toutes les valeurs nutritionnelles. On en sort énergie, sucres, sel, matières grasses, protéines |
+| `nutriments` | STRUCT("name" VARCHAR, "value" FLOAT, "100g" FLOAT, serving FLOAT, unit VARCHAR, prepared_value FLOAT, prepared_100g FLOAT, prepared_serving FLOAT, prepared_unit VARCHAR)[] | toutes les valeurs nutritionnelles. On en sort énergie, sucres, sel, matières grasses, protéines |
 | `nutriscore_grade` | VARCHAR | la note A à E |
 | `nutriscore_score` | INTEGER | le score chiffré |
-| `nutrient_levels_tags` | VARCHAR[] | « trop gras », « trop salé »… pour l'affichage |
 | `nova_group` | INTEGER | niveau de transformation du produit |
 
 ### Qualité et environnement
