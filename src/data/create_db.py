@@ -40,16 +40,42 @@ def insert_in_db(df: pd.DataFrame, name: str) :
         logger.error(f"Échec de l'import ({len(df)} lignes) : {e}")
 
 def insert_produits():
-    pass
+    query = f"""
+        SELECT
+            code,
+            REPLACE(COALESCE(
+            list_extract(list_filter(product_name, x -> x.lang = 'fr'),   1)."text",
+            list_extract(list_filter(product_name, x -> x.lang = 'main'), 1)."text",
+            list_extract(list_filter(product_name, x -> x.lang = 'en'),   1)."text"), chr(0), '')
+            AS product_name,
+            quantity,
+            nutrition_data_per,
+            nutriscore_grade,
+            nutriscore_score,
+            nova_group,
+            completeness,
+            environmental_score_grade,
+            environmental_score_score
+        FROM '{FOOD_FR_PARQUET}'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY code ORDER BY completeness DESC) = 1 --Regroupe par code bar identique et choisi celui qui a un meilleur taux de complétude
+    """
+    df = duckdb.sql(query).df()
+    insert_in_db(df, "produits")
 
 def insert_categories():
-    pass
+    df = duckdb.sql(f"SELECT DISTINCT UNNEST(categories_tags) AS nom FROM '{FOOD_FR_PARQUET}'").df()
+    df = extract_lang(df, "nom")
+    insert_in_db(df, "categories")
 
 def insert_origines():
-    pass
+    df = duckdb.sql(f"SELECT DISTINCT UNNEST(origins_tags) AS nom FROM '{FOOD_FR_PARQUET}'").df()
+    df = extract_lang(df, "nom")
+    insert_in_db(df, "origines")
 
 def insert_additifs():
-    pass
+    df = duckdb.sql(f"SELECT DISTINCT UNNEST(additives_tags) AS nom FROM '{FOOD_FR_PARQUET}'").df()
+    df = extract_lang(df,"nom")
+    insert_in_db(df,"additifs")
 
 def insert_images():
     pass
