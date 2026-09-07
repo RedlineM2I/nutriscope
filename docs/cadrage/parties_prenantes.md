@@ -40,6 +40,7 @@
   - Usage : dans un magasin, scanne et regarde le meilleur nutri-score pour chaque produit
   - Nutri-score visible en 1 regard, additifs nocifs, alternatives plus saines
 
+
 ## 3. Trame d'entretien semi-directif
 
 > Prendre des notes
@@ -65,5 +66,22 @@
 1. Quel est le business model ? Comment ça rapporte de l'argent ? [Contexte / Objectif]
 
 
+## 4. Compte rendu de l'entretien
 
+L'entretien nous a permis de mieux comprendre les enjeux de l'application : l'objectif de cette dernière est de proposer un outil acecssible à tout le monde, avec des recommandations nutritionnelles personnalisées pour chaque utilisateur. L'objectif est d'avoir une version finalisée d'ici quatre mois, avec une démo prévue pour dans deux semaines et un pilote du projet pour dans trois mois. 
+
+Sont attendus dans le délivrable : 
+- Une fonction de recherche de produit
+- La possibilité de scanner le code-barres d'un produit
+- Ces deux méthodes permettant de renvoyer la fiche synthétique de ce dernier
+- Un outil de comparaison entre plusieurs produits
+- Un assistant conversationnel pour proposer des recommandations à l'utilisateur
+- Une interface mobile fluide et rassurante pour l'utilisateur
+
+Concernant le scope des produits, il faudrait idéalement privilégier ceux trouvables en France. 
+Le public cible est la population générale, mais avec un accent particulier sur les familles pressées, qui ne souhaitent pas passer beaucoup de temps sur les courses mais qui aimeraient tout de même faire attention à ce qu'ils consomment.
+
+Concernant la personnalisation, c'est encore à voir avec la DPO, mais dans l'idée, l'objectif serait de pouvoir avoir le maximum de personnalisation possible dans le cadre de ce qu'il nous est possible de faire avec le cadre imposé. L'historique de recherche serait possiblement compris dans les données gardées pour la personnalisation.
+
+Enfin, concernant le business model, ce dernier se baserait sur des partenariats avec les marques / entreprises.
 
