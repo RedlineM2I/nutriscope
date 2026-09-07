@@ -4,6 +4,7 @@ import logging
 from _duckdb import DuckDBPyConnection
 from sqlalchemy import Connection
 
+from src.config import timer
 from src.data.db.connection import get_engine
 from src.data.extract.tags import build_link_table
 
@@ -31,11 +32,13 @@ def insert_all_in_db(conn_duckdb : DuckDBPyConnection) :
                 id_tag_nm_table, link_table = build_link_table(conn_duckdb, source_col, "nom", table_name)
                 insert_in_db_copy(id_tag_nm_table, table_name, conn)
                 insert_in_db_copy(link_table, f"produits_{table_name}", conn)
-            #insert_nutriments(con, conn)
+            #insert_nutriments(get_nutriments(conn_duckdb), conn)
     except Exception as e:
         logger.error(f"Échec de l'import : {e}")
 
+@timer
 def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn : Connection, columns_int: list[str] = None) :
+    print(f"Insertion des données dans la table {table_name}")
     df = df.copy()
     for col in columns_int or []:
         df[col] = df[col].astype("Int64")

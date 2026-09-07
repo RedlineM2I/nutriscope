@@ -1,6 +1,8 @@
 import pandas as pd
 from _duckdb import DuckDBPyConnection
 
+from src.config import timer
+
 def get_code_tag_nm_table(conn, source_column:str, column_name: str) -> pd.DataFrame:
     return conn.sql(f"""
         SELECT code AS produit_code,
@@ -8,6 +10,7 @@ def get_code_tag_nm_table(conn, source_column:str, column_name: str) -> pd.DataF
         FROM produits_dedup
     """).df()
 
+@timer
 def build_link_table(conn : DuckDBPyConnection, source_column : str, column_name : str, table_name : str) :
     """
     Construit une table de liaison entre la table table_name et la table produit
@@ -17,6 +20,7 @@ def build_link_table(conn : DuckDBPyConnection, source_column : str, column_name
     :param table_name: nom de la table à créer
     :return: DataFrame de la nouvelle table ainsi que son DataFrame de liaison
     """
+    print(f"Récupération des données pour la table {table_name}")
     link = get_code_tag_nm_table(conn, source_column, column_name)
     id_tag_nm_table = link[[column_name]].drop_duplicates().reset_index(drop=True).reset_index( names="id")
 
