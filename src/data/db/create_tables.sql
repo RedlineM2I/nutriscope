@@ -62,6 +62,7 @@ CREATE TABLE produits_categories
     produit_code VARCHAR REFERENCES produits (code),
     categorie_id INTEGER REFERENCES categories (id),
     PRIMARY KEY (produit_code, categorie_id)
+
 );
 
 CREATE TABLE labels

@@ -1,5 +1,4 @@
-import duckdb
-from src.data.create_db import FOOD_FR_PARQUET
+FOOD_FR_PARQUET = "../../data/food_france.parquet"
 
 def create_produits_code_clean(conn) :
     conn.sql(f"""
