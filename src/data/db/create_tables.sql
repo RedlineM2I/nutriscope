@@ -1,19 +1,19 @@
-DROP TABLE IF EXISTS produits CASCADE ;
-DROP TABLE IF EXISTS categories CASCADE;
-DROP TABLE IF EXISTS origines CASCADE;
-DROP TABLE IF EXISTS additifs CASCADE;
-DROP TABLE IF EXISTS images CASCADE;
-DROP TABLE IF EXISTS nutriments CASCADE;
-DROP TABLE IF EXISTS marques CASCADE;
-DROP TABLE IF EXISTS labels CASCADE;
-DROP TABLE IF EXISTS ingredients CASCADE;
+DROP TABLE IF EXISTS produits_nutriments_secondaires CASCADE;
 DROP TABLE IF EXISTS produits_additifs CASCADE;
 DROP TABLE IF EXISTS produits_labels CASCADE;
 DROP TABLE IF EXISTS produits_marques CASCADE;
 DROP TABLE IF EXISTS produits_origines CASCADE;
 DROP TABLE IF EXISTS produits_categories CASCADE;
 DROP TABLE IF EXISTS produits_ingredients CASCADE;
-DROP TABLE IF EXISTS produits_nutriments CASCADE;
+DROP TABLE IF EXISTS produits CASCADE ;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS origines CASCADE;
+DROP TABLE IF EXISTS additifs CASCADE;
+DROP TABLE IF EXISTS images CASCADE;
+DROP TABLE IF EXISTS marques CASCADE;
+DROP TABLE IF EXISTS labels CASCADE;
+DROP TABLE IF EXISTS ingredients CASCADE;
+DROP TABLE IF EXISTS valeurs_nutritionnelles CASCADE;
 
 -- ============================================================
 -- Schéma relationnel OpenFoodFacts (pour dbdiagram.io)
@@ -125,18 +125,25 @@ CREATE TABLE produits_additifs
 -- Nutrition (un produit a plusieurs lignes de nutriments)
 -- ============================================================
 
-CREATE TABLE nutriments
-(
-    id         SERIAL PRIMARY KEY,
-    name       VARCHAR,
-    value_100g FLOAT,
-    unit       VARCHAR
+CREATE TABLE valeurs_nutritionnelles (
+    produit_code VARCHAR PRIMARY KEY REFERENCES produits(code),
+    energie_100g FLOAT, --En kcal
+    matieres_grasses_100g FLOAT,
+    acides_gras_satures_100g FLOAT,
+    glucides_100g FLOAT,
+    sucres_100g FLOAT,
+    fibres_100g FLOAT,
+    proteines_100g FLOAT,
+    sel_100g FLOAT,
+    sodium_100g FLOAT
 );
-CREATE TABLE produits_nutriments
-(
-    produit_code  VARCHAR REFERENCES produits (code),
-    nutriments_id INTEGER REFERENCES nutriments (id),
-    PRIMARY KEY (produit_code, nutriments_id)
+
+CREATE TABLE produits_nutriments_secondaires (
+    produit_code VARCHAR REFERENCES produits(code),
+    nutriment_nom VARCHAR,
+    valeur_100g FLOAT,
+    unite VARCHAR,
+    PRIMARY KEY (produit_code, nutriment_nom)
 );
 
 -- ============================================================
