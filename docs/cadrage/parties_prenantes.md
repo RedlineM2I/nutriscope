@@ -68,7 +68,7 @@
 
 ## 4. Compte rendu de l'entretien
 
-L'entretien nous a permis de mieux comprendre les enjeux de l'application : l'objectif de cette dernière est de proposer un outil acecssible à tout le monde, avec des recommandations nutritionnelles personnalisées pour chaque utilisateur. L'objectif est d'avoir une version finalisée d'ici quatre mois, avec une démo prévue pour dans deux semaines et un pilote du projet pour dans trois mois. 
+L'entretien nous a permis de mieux comprendre les enjeux de l'application : l'objectif de cette dernière est de proposer un outil accessible à tout le monde, avec des recommandations nutritionnelles personnalisées pour chaque utilisateur. L'objectif est d'avoir une version finalisée d'ici quatre mois, avec une démo prévue pour dans deux semaines et un pilote du projet pour dans trois mois. 
 
 Sont attendus dans le délivrable : 
 - Une fonction de recherche de produit
@@ -79,9 +79,18 @@ Sont attendus dans le délivrable :
 - Une interface mobile fluide et rassurante pour l'utilisateur
 
 Concernant le scope des produits, il faudrait idéalement privilégier ceux trouvables en France. 
-Le public cible est la population générale, mais avec un accent particulier sur les familles pressées, qui ne souhaitent pas passer beaucoup de temps sur les courses mais qui aimeraient tout de même faire attention à ce qu'ils consomment.
+Le public cible est la population générale, mais avec un accent particulier sur les familles pressées, qui ne souhaitent pas passer beaucoup de temps sur les courses, mais qui aimeraient tout de même faire attention à ce qu'ils consomment.
 
-Concernant la personnalisation, c'est encore à voir avec la DPO, mais dans l'idée, l'objectif serait de pouvoir avoir le maximum de personnalisation possible dans le cadre de ce qu'il nous est possible de faire avec le cadre imposé. L'historique de recherche serait possiblement compris dans les données gardées pour la personnalisation.
+Concernant la personnalisation, c'est encore à voir avec la DPO, mais dans l'idée, l'objectif serait de pouvoir avoir le maximum de personnalisation possible dans le cadre imposé. L'historique de recherche serait possiblement compris dans les données gardées pour la personnalisation.
 
 Enfin, concernant le business model, ce dernier se baserait sur des partenariats avec les marques / entreprises.
 
+## 5. Mise à jour des personas
+
+Selon ce qui a été vu lors de l'entretien, le public cible serait plus particulièrement les familles pressées, même si elle cible le maximum d'utilisateurs.
+
+- Famille pressée
+  - Fatima, 46 ans, mère de famille de 2 enfants, travaille avec son mari pour subvenir à leurs besoins, n'a pas le temps de faire les courses longtemps
+  - Veut savoir si un produit est bon pour ses enfants en 1 scan et 1 clic
+  - Usage : dans le magasin avec ses enfants, elle garde un œil sur eux tout en scannant ses produits préférés
+  - Nutri-score visible en 1 regard, additifs nocifs, alternatives plus saines 
