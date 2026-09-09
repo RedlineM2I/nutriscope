@@ -1,10 +1,12 @@
+from pathlib import Path
+
 import time
 
+BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 
-PARQUET_FILE = '../data/food.parquet'
-CLEAN_PARQUET_FILE = '../data/food_clean.parquet'
-PARQUET_FR = "../data/food_france.parquet"
-
+PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
+CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
+PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 
 def timer(function):
     def f(*args, **kwargs):
