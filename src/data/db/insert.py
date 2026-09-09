@@ -2,10 +2,12 @@ import io
 import pandas as pd
 import logging
 from _duckdb import DuckDBPyConnection
-from sqlalchemy import Connection
+from pandas.core.interchange.dataframe_protocol import DataFrame
+from sqlalchemy import Connection, text
 
 from src.config import timer
 from src.data.db.connection import get_engine
+from src.data.extract.nutriments import get_secondary_nutriments, get_nutriments
 from src.data.extract.tags import build_link_table
 
 #Tables où il faut créer une table de liaison
@@ -26,20 +28,22 @@ def insert_all_in_db(conn_duckdb : DuckDBPyConnection) :
     engine = get_engine()
     try:
         with engine.begin() as conn:  # commit automatique si succès, rollback si erreur
-            insert_products(get_produits(conn_duckdb=conn_duckdb), conn)
+
+            #Chargement
+            insert_products(get_products(conn_duckdb=conn_duckdb), conn)
+            insert_nutriments(get_nutriments(conn_duckdb), get_secondary_nutriments(conn_duckdb), conn)
             for source_col, table_name in TAG_TABLES.items():
                 print(f"Insertion des {table_name}")
                 id_tag_nm_table, link_table = build_link_table(conn_duckdb, source_col, "nom", table_name)
                 insert_in_db_copy(id_tag_nm_table, table_name, conn)
                 insert_in_db_copy(link_table, f"produits_{table_name}", conn)
-            #insert_nutriments(get_nutriments(conn_duckdb), conn)
+
     except Exception as e:
         logger.error(f"Échec de l'import : {e}")
 
 @timer
 def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn : Connection, columns_int: list[str] = None) :
     print(f"Insertion des données dans la table {table_name}")
-    df = df.copy()
     for col in columns_int or []:
         df[col] = df[col].astype("Int64")
 
@@ -59,7 +63,18 @@ def insert_products(df : pd.DataFrame, conn_psql : Connection):
     print("Insertion des produits")
     insert_in_db_copy(df, "produits", conn_psql, columns_int=["nova_group", "nutriscore_score", "environmental_score_score"])
 
-def get_produits(conn_duckdb : DuckDBPyConnection) :
+def insert_nutriments(df_nutriments : pd.DataFrame, df_secondary_nutriments : pd.DataFrame, conn_psql : Connection) :
+    print("Insertion des nutriments")
+    insert_in_db_copy(df_nutriments, "valeurs_nutritionnelles", conn_psql)
+    #100 sec
+    id_nm_unit = df_secondary_nutriments[["nom","unite"]].drop_duplicates(subset="nom").reset_index(drop=True).reset_index(names="id")
+
+    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["nom","unite"])[["produit_code", "id","valeur_100g"]]
+    link_table = link_table.rename(columns={"id": "nutriment_id"}).drop_duplicates(subset=["produit_code", "nutriment_id"])
+    insert_in_db_copy(id_nm_unit, "nutriments", conn_psql)
+    insert_in_db_copy(link_table, "produits_nutriments_secondaires", conn_psql)
+
+def get_products(conn_duckdb : DuckDBPyConnection) -> DataFrame:
     query = f"""
             SELECT
                 code,

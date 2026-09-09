@@ -11,13 +11,12 @@ import duckdb
 PARQUET_FILE = '../data/food.parquet'
 
 def timer(function):
-    def f():
+    def f(*args, **kwargs):
         start = time.perf_counter()
-        res = function()
+        res = function(*args,**kwargs)
         duration = time.perf_counter() - start
         print(f"Temps de traitement : {duration:.3f} secondes")
         return res
-
     return f
 
 
