@@ -120,7 +120,11 @@ def get_products(conn_duckdb : DuckDBPyConnection) -> DataFrame:
                 AS product_name,
                 quantity,
                 nutrition_data_per,
-                nutriscore_grade,
+                case 
+                    when nutriscore_grade = 'unknown' or nutriscore_grade = 'not-applicable' 
+                    then null
+                    else nutriscore_grade
+                end as nutriscore_grade,
                 nutriscore_score,
                 nova_group,
                 completeness,
