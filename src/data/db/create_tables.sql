@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS valeurs_nutritionnelles CASCADE;
 CREATE TABLE produits
 (
     id                        SERIAL PRIMARY KEY,
-    code                      VARCHAR(14) UNIQUE NOT NULL,
+    code                      VARCHAR UNIQUE NOT NULL,
     product_name              VARCHAR,
     quantity                  VARCHAR,
     nutrition_data_per        VARCHAR,

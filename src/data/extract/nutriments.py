@@ -8,7 +8,7 @@ def get_nutriments(conn_duckdb) -> DataFrame:
     :return: Dataframe des nutriments principaux
     """
     return conn_duckdb.sql("""
-           SELECT code as produit_code,
+           SELECT id as produit_id,
                   energie_100g,
                   sucres_100g,
                   glucides_100g,
@@ -30,12 +30,12 @@ def get_secondary_nutriments(conn_duckdb) -> DataFrame :
     """
     return conn_duckdb.sql("""
         SELECT
-            code as produit_code,
+            id as produit_id,
             nutriment.name AS nom,
             nutriment."100g" AS valeur_100g,
             nutriment.unit AS unite
         FROM (
-            SELECT code, UNNEST(nutriments_secondaires) AS nutriment
+            SELECT id, UNNEST(nutriments_secondaires) AS nutriment
             FROM nutriments_extraits
         )
     """).df()

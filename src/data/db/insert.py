@@ -98,8 +98,8 @@ def insert_nutriments(df_nutriments : pd.DataFrame, df_secondary_nutriments : pd
     #100 sec
     id_nm_unit = df_secondary_nutriments[["nom","unite"]].drop_duplicates(subset="nom").reset_index(drop=True).reset_index(names="id")
 
-    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["nom","unite"])[["produit_code", "id","valeur_100g"]]
-    link_table = link_table.rename(columns={"id": "nutriment_id"}).drop_duplicates(subset=["produit_code", "nutriment_id"])
+    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["nom","unite"])[["produit_id", "id","valeur_100g"]]
+    link_table = link_table.rename(columns={"id": "nutriment_id"}).drop_duplicates(subset=["produit_id", "nutriment_id"])
     insert_in_db_copy(id_nm_unit, "nutriments", conn_psql)
     insert_in_db_copy(link_table, "produits_nutriments_secondaires", conn_psql)
 
@@ -111,6 +111,7 @@ def get_products(conn_duckdb : DuckDBPyConnection) -> DataFrame:
     """
     query = f"""
             SELECT
+                id,
                 code,
                 REPLACE(COALESCE(
                 list_extract(list_filter(product_name, x -> x.lang = 'fr'),   1)."text",

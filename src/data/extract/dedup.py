@@ -10,7 +10,7 @@ def create_produits_code_clean(conn : DuckDBPyConnection) :
     """
     conn.sql(f"""
         CREATE OR REPLACE TEMP TABLE produits_dedup AS
-        SELECT *
+        SELECT row_number() over () as id, *
         FROM '{PARQUET_FR}'
         QUALIFY ROW_NUMBER() OVER (PARTITION BY code ORDER BY completeness DESC) = 1
     """)
@@ -24,7 +24,7 @@ def create_nutriments_extraits(conn : DuckDBPyConnection) :
     conn.sql("""
         CREATE OR REPLACE TEMP TABLE nutriments_extraits AS
         SELECT
-            code,
+            id,
         
             -- Énergie : kJ natif, sinon conversion depuis kcal (1 kcal = 4.184 kJ)
             COALESCE(
