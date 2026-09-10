@@ -23,20 +23,41 @@ Pour télécharger le jeu de données (fichier parquet):
 python ../src/data/fetch_data.py
 ````
 
+#### Caractéristiques :
+
+- Dimensions : (4636471, 111)
+- Types : bool(1), float32(1), float64(25), int32(1), object(56), str(27)
+- Utilisation mémoire : 21.8+ GB de ram
+- Taux de remplissage par colonne : 75.72 %
+
 ## Questions :
 
 #### Combien de produits vendus en France ?
 
+Il y a 1 254 128 produits vendus en France
+
 #### Quelle part a un nutri-score renseigné ?
 
-Il y a 1 381 069 produits qui ont un nutri-score
+Il y a 466 032 produits vendus en France avec un nutri-score. Ceux qui ne sont pas éligibles ne sont pas inclus.
+
+### Les dix marques les plus présentes ?
+
+Elles sont : Carrefour, U, Auchan, Leader Price, Casino, Cora, Le Gaulois, Picard, Monoprix et Nestlé
 
 #### le taux de manquants sur les nutriments clés ( energy_100g , sugars_100g , salt_100g ) ? 
 
+Taux de manquants :
+- Sucre : 29.1 %
+- Sel : 33.5 %
+- Énergie : 28.5 %
 
+### Qu'est-ce qui vous semble le plus « sale » dans ces données ?
+
+Les dictionnaires stockés dans les colonnes sont plutôt difficiles à gérer, et on n'est jamais sûr de trouver la donnée qu'on cherche. Il y a beaucoup de données vides. Les intitulés des colonnes sont aussi très peu explicites et diffèrent entre les différents jeux de données. Beaucoup de données sont aussi dupliquées (pas de clés étrangères, catégories sous forme de texte, etc.).
 
 ### Colonnes :
 
+```
 'additives_n',
  'additives_tags',
  'allergens_tags',
@@ -148,3 +169,4 @@ Il y a 1 381 069 produits qui ont un nutri-score
  'with_non_nutritive_sweeteners',
  'with_sweeteners',
  'schema_version'
+```

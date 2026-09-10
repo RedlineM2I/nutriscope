@@ -12,6 +12,10 @@ class TqdmUpTo(tqdm):
         self.update(blocks * block_size - self.n)
 
 def download():
+    """
+    Télécharge le fichier parquet depuis l'url et affiche une barre de progression
+    :return:
+    """
     DEST.parent.mkdir(parents=True, exist_ok=True)
     with TqdmUpTo(unit="B", unit_scale=True, unit_divisor=1024, desc=DEST.name) as bar:
         urllib.request.urlretrieve(URL, DEST, reporthook=bar.update_to)
