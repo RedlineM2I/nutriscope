@@ -1,12 +1,10 @@
 import duckdb
 from sqlalchemy import text
 
-from src.config import timer
+from src.config import timer, SCRIPT_CREATION
 from src.data.db.connection import get_engine
 from src.data.db.insert import insert_all_in_db
 from src.data.extract.dedup import create_produits_code_clean, create_nutriments_extraits
-
-SCRIPT_CREATION = "./db/create_tables.sql"
 
 @timer
 def create_tables() -> None :
