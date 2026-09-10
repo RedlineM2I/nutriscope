@@ -2,6 +2,11 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 
 
 def get_nutriments(conn_duckdb) -> DataFrame:
+    """
+    Extrait les nutriments de la base DuckDB
+    :param conn_duckdb: Connexion à la base DuckDB
+    :return: Dataframe des nutriments principaux
+    """
     return conn_duckdb.sql("""
            SELECT code as produit_code,
                   energie_100g,
@@ -18,6 +23,11 @@ def get_nutriments(conn_duckdb) -> DataFrame:
            """).df()
 
 def get_secondary_nutriments(conn_duckdb) -> DataFrame :
+    """
+    Extrait les nutriments secondaires de la base DuckDB
+    :param conn_duckdb: Connexion à la base DuckDB
+    :return: Dataframe des nutriments secondaires
+    """
     return conn_duckdb.sql("""
         SELECT
             code as produit_code,

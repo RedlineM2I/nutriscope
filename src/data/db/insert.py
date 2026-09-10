@@ -19,12 +19,20 @@ TAG_TABLES = {
     "labels_tags": "labels",
     "ingredients_tags": "ingredients",
 }
+"""
+Noms de colonnes dans le fichier parquet où il faut créer une table de liaison associés des noms de table dans la BDD
+"""
 
 # Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def insert_all_in_db(conn_duckdb : DuckDBPyConnection) :
+    """
+    Insertion de toutes les tables dans la base de donnée
+    :param conn_duckdb: Connexion à la base duckdb
+    :return:
+    """
     engine = get_engine()
     try:
         with engine.begin() as conn:  # commit automatique si succès, rollback si erreur
@@ -43,6 +51,14 @@ def insert_all_in_db(conn_duckdb : DuckDBPyConnection) :
 
 @timer
 def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn : Connection, columns_int: list[str] = None) :
+    """
+    Insertion en base en créant un buffer CSV
+    :param df: Dataframe à insérer dans la base
+    :param table_name: Table dans laquelle on insère le dataframe
+    :param conn: Connexion à la BDD
+    :param columns_int: Noms des colonnes à convertir en Integer
+    :return:
+    """
     print(f"Insertion des données dans la table {table_name}")
     for col in columns_int or []:
         df[col] = df[col].astype("Int64")
@@ -60,10 +76,23 @@ def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn : Connection, colu
     logger.info(f"{len(df)} lignes importées avec succès")
 
 def insert_products(df : pd.DataFrame, conn_psql : Connection):
+    """
+    Insertion des produits dans la base
+    :param df: DataFrame des produits
+    :param conn_psql: Connexion à la BDD
+    :return:
+    """
     print("Insertion des produits")
     insert_in_db_copy(df, "produits", conn_psql, columns_int=["nova_group", "nutriscore_score", "environmental_score_score"])
 
 def insert_nutriments(df_nutriments : pd.DataFrame, df_secondary_nutriments : pd.DataFrame, conn_psql : Connection) :
+    """
+    Insertion des nutriments dans la base
+    :param df_nutriments: Dataframe des nutriments principaux
+    :param df_secondary_nutriments: Dataframe des nutriments secondaires
+    :param conn_psql: Connexion à la BDD
+    :return:
+    """
     print("Insertion des nutriments")
     insert_in_db_copy(df_nutriments, "valeurs_nutritionnelles", conn_psql)
     #100 sec
@@ -75,6 +104,11 @@ def insert_nutriments(df_nutriments : pd.DataFrame, df_secondary_nutriments : pd
     insert_in_db_copy(link_table, "produits_nutriments_secondaires", conn_psql)
 
 def get_products(conn_duckdb : DuckDBPyConnection) -> DataFrame:
+    """
+    Extrait les produits de la base DuckDB
+    :param conn_duckdb: Connexion à la base DuckDB
+    :return: Dataframe des produits
+    """
     query = f"""
             SELECT
                 code,

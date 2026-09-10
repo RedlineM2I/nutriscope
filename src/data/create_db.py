@@ -9,7 +9,11 @@ from src.data.extract.dedup import create_produits_code_clean, create_nutriments
 SCRIPT_CREATION = "./db/create_tables.sql"
 
 @timer
-def create_tables() :
+def create_tables() -> None :
+    """
+    Crée les tables à partir du script de création
+    :return:
+    """
     print("Création des tables")
     with open(SCRIPT_CREATION, "r") as f:
         sql_script = f.read()
