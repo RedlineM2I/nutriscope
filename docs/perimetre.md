@@ -231,3 +231,7 @@ On sait que notre périmètre n'est pas parfait. Les points qu'une autre équipe
 - **Les rayons peuvent quand même se recouper.** Un même produit peut être dans plusieurs de nos
   7 catégories. Il faudra décider à quel rayon on le rattache.
 - **On n'a pas encore le volume final** du catalogue une fois tous les filtres appliqués.
+
+## 10. Autres informations
+
+Concernant l'énergie parmi les nutriments, on a décidé de garder seulement l'énergie en kCal, et de convertir ceux en kJ.
