@@ -1,16 +1,17 @@
 # TP 7 — Hypothèses de coûts et de revenus (NutriScope)
 
-Version simplifiée, pédagogique, pour compléter le tableur ROI du TP 7. Trois scénarios : pessimiste, central, optimiste, sur 12 mois d'exploitation (au-delà de la phase pédagogique).
-
 ## 1. Idée générale
 
-On chiffre ce que coûterait NutriScope **s'il tournait vraiment en production pendant un an**, pas seulement pendant le TP. Quatre postes de coûts, plus les revenus/économies selon le modèle du TP 6.
+On chiffre ce que coûterait NutriScope **s'il tournait vraiment en production pendant un an**.
+- Hypothèse des coûts sur 12 mois
+- Hypothèse des revenus / économies selon le modèle choisi (au TP 6)
+- Calcul de ROI sur trois scénarios : pessimiste, central et optimiste
 
 ## 2. Hypothèses de coûts sur 12 mois
 
 ### 2.1 Hébergement (API + base + front)
 
-On prend un hébergement simple type VPS/PaaS (Scalingo, Railway, OVH, Fly.io) plutôt qu'une grosse infra cloud, cohérent avec une v1 à faible trafic.
+Pensée générale : hébergement simple type VPS/PaaS (Scalingo, Railway, OVH, Fly.io) plutôt qu'une grosse infra cloud (en estimant un faible trafic sur la v1).
 
 | Poste | Hypothèse | Coût mensuel | Coût annuel |
 |---|---|---|---|
@@ -19,7 +20,7 @@ On prend un hébergement simple type VPS/PaaS (Scalingo, Railway, OVH, Fly.io) p
 | Base vectorielle (RAG) | Qdrant/Chroma en instance légère, colocalisée | inclus ou ~10 € | ~0-120 € |
 | **Total hébergement** | | **~45-55 €** | **~540-660 €** |
 
-**Pourquoi c'est simple** : au volume visé (quelques centaines à quelques milliers d'utilisateurs), on n'a pas besoin d'auto-scaling ni de cluster. Un VPS suffit ; le coût explose seulement si le trafic est massif.
+Au volume visé (quelques centaines à quelques milliers d'utilisateurs), un VPS suffit. Le coût n'explose seulement que si le trafic est massif.
 
 ### 2.2 Tokens LLM (assistant conversationnel)
 
@@ -33,7 +34,7 @@ Hypothèses : un modèle économique type GPT-4o-mini ou Mistral Small (~0,15 �
 | Central | 200 | ~73 000 | ~40 € |
 | Optimiste | 800 | ~292 000 | ~155 € |
 
-**Pourquoi c'est simple** : un modèle "mini" coûte très peu par conversation. Le vrai risque n'est pas le prix unitaire mais un usage massif ou un modèle mal choisi (un modèle "grand" 20 à 50 fois plus cher changerait complètement l'équation). C'est pour ça que l'objectif Q7 de la note de cadrage impose de suivre le coût par conversation en continu, pas seulement de l'estimer une fois.
+Un modèle "mini" coûte très peu par conversation. Le vrai risque n'est pas le prix unitaire mais un usage massif ou un modèle mal choisi (un modèle "grand" 20 à 50 fois plus cher changerait complètement le calcul). C'est pour ça que l'objectif Q7 de la note de cadrage impose de suivre le coût par conversation en continu et pas seulement de l'estimer une fois.
 
 ### 2.3 Stockage images
 
@@ -45,13 +46,13 @@ Les photos produits viennent d'Open Food Facts (déjà hébergées par eux), mai
 | Central | 50 Go | 0,02 € | ~12 € |
 | Optimiste | 150 Go | 0,02 € | ~36 € |
 
-**Pourquoi c'est simple** : le stockage brut est le poste le moins cher de tous. Le vrai coût caché serait la bande passante si l'appli sert elle-même des millions d'images, mais en s'appuyant sur les URLs Open Food Facts en v1, ce risque est évité.
+Le stockage brut est le point le moins cher de tous. Le vrai coût caché serait la bande passante si l'appli sert elle-même des millions d'images, mais en s'appuyant sur les URLs Open Food Facts en v1, ce risque est évité.
 
 ### 2.4 Temps homme
 
-C'est le poste qui domine tout le reste, de très loin. Une fois le produit déployé (après le TP, en exploitation réelle), il faut du temps pour la maintenance, le support, et les évolutions.
+C'est le point qui domine tout le reste, de très loin. Une fois le produit déployé (après le TP, en exploitation réelle), il faut du temps pour la maintenance, le support, et les évolutions.
 
-Hypothèse simple : 3 heures/semaine sur ~44 semaines actives (hors pauses), à un taux chargé de 45 €/heure (ordre de grandeur alternant/junior avec charges) :
+Une hypothèse simple : 3 heures/semaine sur ~44 semaines actives (hors pauses), à un taux chargé de 45 €/heure (ordre de grandeur alternant/junior avec charges) :
 
 - 132 heures/an × 45 €/heure = **~5 940 €/an**
 
@@ -81,7 +82,7 @@ Gratuit avec un abonnement payant qui débloque des fonctions avancées (recherc
 - Prix : 3 €/mois (positionnement moins cher que Yuka à 10 €/an... ici plutôt ~36 €/an, à ajuster selon le choix d'équipe).
 - Calcul : 8 000 × 5 % × 3 €/mois × 12 mois = **~14 400 €/an**.
 
-**Simplement** : c'est le modèle le plus proche de ce que fait le leader du marché, mais il suppose déjà une base d'utilisateurs significative — difficile à atteindre en v1 sans budget d'acquisition, ce que le SWOT du benchmark souligne explicitement.
+C'est le modèle le plus proche de ce que fait le leader du marché, mais il suppose déjà une base d'utilisateurs significative — difficile à atteindre en v1 sans budget d'acquisition, ce que le SWOT du benchmark souligne explicitement.
 
 ### 3.2 B2B (comme myLabel ou ScanUp)
 
@@ -90,7 +91,7 @@ L'application reste gratuite pour le grand public ; le revenu vient de la vente 
 - Hypothèse : 2 clients B2B (par exemple une enseigne de distribution et une mutuelle santé) à 6 000 €/an chacun pour un accès à des tableaux de bord agrégés par rayon.
 - Calcul : 2 × 6 000 € = **~12 000 €/an**.
 
-**Simplement** : ce modèle valorise la donnée déjà nettoyée par le pipeline (TP 9-13), qui est en réalité l'actif le plus solide du projet. Le risque : il faut des volumes et une réputation de neutralité pour convaincre des clients B2B, ce que ScanUp a par exemple perdu en abandonnant Open Food Facts pour des données "propres" mais fermées.
+Ce modèle valorise la donnée déjà nettoyée par le pipeline, qui est en réalité l'actif le plus solide du projet. Le risque : il faut des volumes et une réputation de neutralité pour convaincre des clients B2B, ce que ScanUp a par exemple perdu en abandonnant Open Food Facts pour des données "propres" mais fermées.
 
 ### 3.3 Marque blanche
 
@@ -99,7 +100,7 @@ On licencie la technologie (score, moteur de substitution, assistant) à un tier
 - Hypothèse : 1 licence à 15 000 €/an avec un distributeur régional ou une chaîne de magasins bio, incluant maintenance et évolutions mineures.
 - Calcul : **~15 000 €/an**.
 
-**Simplement** : c'est le modèle qui rapporte le plus par client mais qui dépend d'un seul contrat — le risque de concentration est élevé (perte du client = perte de tout le revenu), contrairement au freemium qui répartit le risque sur beaucoup de petits utilisateurs.
+C'est le modèle qui rapporte le plus par client mais qui dépend d'un seul contrat — le risque de concentration est élevé (perte du client = perte de tout le revenu), contrairement au freemium qui répartit le risque sur beaucoup de petits utilisateurs.
 
 ### 3.4 Synthèse comparative
 
@@ -116,3 +117,11 @@ Avec un coût total d'exploitation autour de 6 500-6 800 €/an (section 2.5), l
 1. **Le taux de conversion freemium à 5 %** : sans budget d'acquisition ni notoriété face à Yuka (88 % de part d'usage), ce chiffre pourrait être surestimé d'un facteur 2 à 5.
 2. **Le temps homme à 3h/semaine** : sous-estimé si l'assistant RAG génère du support utilisateur (questions mal répondues, garde-fous à ajuster) ou si l'infrastructure a des incidents, comme le vit Open Food Facts lui-même avec son serveur à 3x sa capacité.
 3. **La capacité à signer des contrats B2B/marque blanche en 12 mois** : ce sont des cycles de vente longs (plusieurs mois de négociation), incompatibles avec le calendrier pédagogique du fil rouge ; ce sont des hypothèses de moyen terme, pas de l'année 1.
+
+## Bonus : coûts de conception
+
+Nous ne prenons pas en compte les coups de conception dans le calcul sur un an, mais si l'on doit estimer ces derniers en tenant compte de la taille de notre équipe et en prenant notre TP fil rouge comme référentiel (216 h), on aurait alors :
+
+216 (heures) x 3 (personnes) x 45 (taux horaire chargé) = **29 160 €** de coûts de conception.
+
+Cependant, il s'agit d'une hypothèse volontairement simple, car en réalité nous ne sommes pas mobilisés nécessairement à 100% sur chaque TP. Ce chiffre représente donc un plafond raisonnable et non une mesure fine.
