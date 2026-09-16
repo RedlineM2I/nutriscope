@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import text
 
+
 def drop_constraints(conn, tables: list[str], types: tuple[str, ...] = ('f', 'p')) -> list[tuple]:
     """
     Supprime les contraintes (FK et/ou PK) des tables données pour accélérer le

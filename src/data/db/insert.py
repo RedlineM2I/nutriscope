@@ -1,14 +1,14 @@
 import io
+import logging
 from concurrent.futures import ProcessPoolExecutor
 
 import pandas as pd
-import logging
 from _duckdb import DuckDBPyConnection
 from sqlalchemy import Connection
 
 from src.config import timer
 from src.data.db.connection import get_engine
-from src.data.extract.nutriments import get_secondary_nutriments, get_nutriments
+from src.data.extract.nutriments import get_nutriments, get_secondary_nutriments_link_table
 from src.data.extract.tags import build_link_table
 
 # Tables où il faut créer une table de liaison
@@ -39,8 +39,7 @@ def insert_all_in_db(conn_duckdb: DuckDBPyConnection):
         all_tables = {}
         products = get_products(conn_duckdb=conn_duckdb)
         nutriments = get_nutriments(conn_duckdb)
-        secondary_nutriments, products_secondary_nutriments = get_secondary_nutriments_link_table(
-            get_secondary_nutriments(conn_duckdb))
+        secondary_nutriments, products_secondary_nutriments = get_secondary_nutriments_link_table(conn_duckdb)
         for source_col, table_name in TAG_TABLES.items():
             id_tag_nm_table, link_table = build_link_table(conn_duckdb, source_col, "nom", table_name)
             all_tables[table_name] = (id_tag_nm_table, link_table)
@@ -63,11 +62,18 @@ def insert_all_in_db(conn_duckdb: DuckDBPyConnection):
         raise e
 
 
-def insert_one_item(table_name, table, columns_int: list[str] = None):
+def insert_one_item(table_name: str, table: pd.DataFrame, columns_int: list[str] = None):
+    """
+    Création d'une connexion puis insertion en base
+    :param table_name: Table dans laquelle insérer le dataframe
+    :param table: Dataframe à insérer dans la base
+    :param columns_int: Noms des colonnes à convertir en Integer
+    :return:
+    """
+
     @timer(label=table_name)
     def tmp():
         with get_engine().begin() as conn:
-            print(f"Insertion des {table_name}")
             insert_in_db_copy(table, table_name, conn, columns_int=columns_int)
 
     tmp()
@@ -97,15 +103,6 @@ def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn: Connection, colum
         buffer
     )
     logger.info(f"{len(df)} lignes importées avec succès")
-
-
-def get_secondary_nutriments_link_table(df_secondary_nutriments: pd.DataFrame):
-    id_nm_unit = df_secondary_nutriments[["nom", "unite"]].drop_duplicates(subset="nom").reset_index(
-        drop=True).reset_index(names="id")
-    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["nom", "unite"])[["produit_id", "id", "valeur_100g"]]
-    link_table = link_table.rename(columns={"id": "nutriment_id"}).drop_duplicates(
-        subset=["produit_id", "nutriment_id"])
-    return id_nm_unit, link_table
 
 
 def get_products(conn_duckdb: DuckDBPyConnection) -> pd.DataFrame:
