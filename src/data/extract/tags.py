@@ -27,7 +27,6 @@ def build_link_table(conn_duckdb : DuckDBPyConnection, source_column : str, colu
     :param table_name: Nom de la table à créer
     :return: DataFrame de la nouvelle table ainsi que son DataFrame de liaison
     """
-    print(f"Récupération des données pour la table {table_name}")
     link = get_id_tag_nm_table(conn_duckdb, source_column, column_name)
     id_tag_nm_table = link[[column_name]].drop_duplicates().reset_index(drop=True).reset_index( names="id")
 
