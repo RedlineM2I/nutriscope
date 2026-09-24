@@ -2,8 +2,10 @@ import urllib.request
 from pathlib import Path
 from tqdm import tqdm
 
+from src.config import BASE_DIR
+
 URL = "https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet?download=true"
-DEST = Path(__file__).resolve().parents[2] / "data" / "food.parquet"
+DEST = BASE_DIR / "data" / "food.parquet"
 
 
 class TqdmUpTo(tqdm):
