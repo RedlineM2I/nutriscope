@@ -11,6 +11,7 @@ PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/data/db/create_tables.sql"
 
+
 def timer(func=None, *, label=None, store=None):
     """
     Mesure le temps d'exécution.
@@ -24,10 +25,11 @@ def timer(func=None, *, label=None, store=None):
     Fonctionne sur n'importe quelle fonction OU méthode (grâce à *args/**kwargs
     et functools.wraps). Le temps est loggué même si la fonction lève.
     """
-    def decorator(fn):
-        name = label or fn.__qualname__          # __qualname__ => "Classe.methode"
 
-        @functools.wraps(fn)                      # garde nom, docstring, signature
+    def decorator(fn):
+        name = label or fn.__qualname__  # __qualname__ => "Classe.methode"
+
+        @functools.wraps(fn)  # garde nom, docstring, signature
         def wrapper(*args, **kwargs):
             start = time.perf_counter()
             try:
@@ -37,6 +39,7 @@ def timer(func=None, *, label=None, store=None):
                 print(f"[{name}] {duration:.3f} s")
                 if store is not None:
                     store[name] = duration
+
         return wrapper
 
     # @timer          -> func est la fonction        -> on décore tout de suite
