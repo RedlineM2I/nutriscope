@@ -19,15 +19,13 @@ def create_tables() -> None:
     Crée les tables à partir du script de création
     :return:
     """
-    print("Création des tables")
     with open(SCRIPT_CREATION, "r") as f:
         sql_script = f.read()
 
-    with get_engine().begin() as conn:
-        for statement in sql_script.split(";"):
-            statement = statement.strip()
-            if statement:
-                conn.execute(text(statement))
+    for statement in sql_script.split(";"):
+        statement = statement.strip()
+        if statement:
+            conn.execute(text(statement))
 
 
 @timer

@@ -5,28 +5,29 @@ DROP TABLE IF EXISTS produits_marques CASCADE;
 DROP TABLE IF EXISTS produits_origines CASCADE;
 DROP TABLE IF EXISTS produits_categories CASCADE;
 DROP TABLE IF EXISTS produits_ingredients CASCADE;
-DROP TABLE IF EXISTS nutriments_secondaires CASCADE;
-DROP TABLE IF EXISTS produits CASCADE;
+DROP TABLE IF EXISTS nutriments CASCADE;
+DROP TABLE IF EXISTS produits CASCADE ;
 DROP TABLE IF EXISTS categories CASCADE;
-DROP TABLE IF EXISTS origines CASCADE;
-DROP TABLE IF EXISTS additifs CASCADE;
+DROP TABLE IF EXISTS origins CASCADE;
+DROP TABLE IF EXISTS additives CASCADE;
 DROP TABLE IF EXISTS images CASCADE;
-DROP TABLE IF EXISTS marques CASCADE;
+DROP TABLE IF EXISTS brands CASCADE;
 DROP TABLE IF EXISTS labels CASCADE;
 DROP TABLE IF EXISTS ingredients CASCADE;
-DROP TABLE IF EXISTS valeurs_nutritionnelles CASCADE;
+DROP TABLE IF EXISTS nutritional_values CASCADE;
 
 -- ============================================================
 -- Schéma relationnel OpenFoodFacts (pour dbdiagram.io)
 -- ============================================================
 
 -- Table principale : un produit par code-barres
-CREATE TABLE produits
+CREATE TABLE products
 (
     id                        SERIAL PRIMARY KEY,
     code                      VARCHAR UNIQUE NOT NULL,
     product_name              VARCHAR,
     quantity                  VARCHAR,
+    main_category             INTEGER REFERENCES categories (id),
     nutrition_data_per        VARCHAR,
     nutriscore_grade          VARCHAR, -- CHAR(1) CHECK (nutriscore_grade IN ('a','b','c','d','e'))
     nutriscore_score          SMALLINT,
@@ -40,57 +41,57 @@ CREATE TABLE produits
 -- Classification (relations many-to-many via tables de liaison)
 -- ============================================================
 
-CREATE TABLE marques
+CREATE TABLE brands
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_marques
+CREATE TABLE products_brands
 (
-    produit_id INTEGER REFERENCES produits (id),
-    marque_id  INTEGER REFERENCES marques (id),
-    PRIMARY KEY (produit_id, marque_id)
+    product_id INTEGER REFERENCES products (id),
+    brand_id  INTEGER REFERENCES brands (id),
+    PRIMARY KEY (product_id, brand_id)
 );
 
 CREATE TABLE categories
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_categories
+CREATE TABLE products_categories
 (
-    produit_id   INTEGER REFERENCES produits (id),
+    product_id   INTEGER REFERENCES products (id),
     categorie_id INTEGER REFERENCES categories (id),
-    PRIMARY KEY (produit_id, categorie_id)
+    PRIMARY KEY (product_id, categorie_id)
 
 );
 
 CREATE TABLE labels
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_labels
+CREATE TABLE products_labels
 (
-    produit_id INTEGER REFERENCES produits (id),
+    product_id INTEGER REFERENCES products (id),
     label_id   INTEGER REFERENCES labels (id),
-    PRIMARY KEY (produit_id, label_id)
+    PRIMARY KEY (product_id, label_id)
 );
 
-CREATE TABLE origines
+CREATE TABLE origins
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_origines
+CREATE TABLE products_origins
 (
-    produit_id INTEGER REFERENCES produits (id),
-    origine_id INTEGER REFERENCES origines (id),
-    PRIMARY KEY (produit_id, origine_id)
+    product_id INTEGER REFERENCES products (id),
+    origin_id INTEGER REFERENCES origins (id),
+    PRIMARY KEY (product_id, origin_id)
 );
 
 -- ============================================================
@@ -100,36 +101,36 @@ CREATE TABLE produits_origines
 CREATE TABLE ingredients
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_ingredients
+CREATE TABLE products_ingredients
 (
-    produit_id    INTEGER REFERENCES produits (id),
+    product_id    INTEGER REFERENCES products (id),
     ingredient_id INTEGER REFERENCES ingredients (id),
-    PRIMARY KEY (produit_id, ingredient_id)
+    PRIMARY KEY (product_id, ingredient_id)
 );
 
-CREATE TABLE additifs
+CREATE TABLE additives
 (
     id  SERIAL PRIMARY KEY,
-    nom VARCHAR UNIQUE NOT NULL
+    name VARCHAR UNIQUE NOT NULL
 );
 
-CREATE TABLE produits_additifs
+CREATE TABLE products_additives
 (
-    produit_id INTEGER REFERENCES produits (id),
-    additif_id INTEGER REFERENCES additifs (id),
-    PRIMARY KEY (produit_id, additif_id)
+    product_id INTEGER REFERENCES products (id),
+    additive_id INTEGER REFERENCES additives (id),
+    PRIMARY KEY (product_id, additive_id)
 );
 
 -- ============================================================
 -- Nutrition (un produit a plusieurs lignes de nutriments)
 -- ============================================================
 
-CREATE TABLE valeurs_nutritionnelles
+CREATE TABLE nutritional_values
 (
-    produit_id               INTEGER REFERENCES produits (id),
+    product_id               INTEGER REFERENCES products (id),
     energie_100g             FLOAT, --En kJ
     matieres_grasses_100g    FLOAT,
     acides_gras_satures_100g FLOAT,
@@ -145,16 +146,16 @@ CREATE TABLE valeurs_nutritionnelles
 CREATE TABLE nutriments_secondaires
 (
     id    SMALLINT PRIMARY KEY,
-    nom   VARCHAR UNIQUE,
-    unite VARCHAR
+    name   VARCHAR UNIQUE,
+    unit VARCHAR
 );
 
-CREATE TABLE produits_nutriments_secondaires
+CREATE TABLE products_nutriments_secondary
 (
     produit_id   INTEGER REFERENCES produits (id),
-    nutriment_id SMALLINT REFERENCES nutriments_secondaires (id),
+    nutriment_id SMALLINT REFERENCES nutriments (id),
     valeur_100g  REAL,
-    PRIMARY KEY (produit_id, nutriment_id)
+    PRIMARY KEY (product_id, nutriment_id)
 );
 
 -- ============================================================
@@ -164,8 +165,8 @@ CREATE TABLE produits_nutriments_secondaires
 CREATE TABLE images
 (
     id         SERIAL PRIMARY KEY,
-    produit_id INTEGER REFERENCES produits (id),
+    product_id INTEGER REFERENCES products (id),
     url        VARCHAR,
     type       VARCHAR,
-    langue     VARCHAR
+    language     VARCHAR
 );
