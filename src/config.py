@@ -11,6 +11,19 @@ PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/data/db/create_tables.sql"
 
+BLUE, YELLOW, BOLD, RESET = "\033[34m", "\033[33m", "\033[1m", "\033[0m"
+WIDTH = 60
+
+def title1(text):
+    print(f"\n{BLUE}{'=' * WIDTH}{RESET}")
+    print(f"{BOLD}{text.upper().center(WIDTH)}{RESET}")
+    print(f"{BLUE}{'=' * WIDTH}{RESET}\n")
+
+def title2(text):
+    w = WIDTH * 2 // 3
+    # print(f"\n{YELLOW}{'-' * w}{RESET}")
+    print(f"\n{YELLOW}{BOLD} >> {text.upper()}{RESET}\n")
+    # print(f"{YELLOW}{'-' * w}{RESET}")
 
 def timer(func=None, *, label=None, store=None):
     """
