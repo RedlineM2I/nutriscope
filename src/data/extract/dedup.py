@@ -3,7 +3,7 @@ from _duckdb import DuckDBPyConnection
 from src.config import PARQUET_FR
 
 
-def create_produits_code_clean(conn: DuckDBPyConnection):
+def create_temp_products(conn: DuckDBPyConnection):
     """
     Crée une table temporaire propre des produits à partir du fichier parquet
     :param conn: Connexion à la base duckdb
@@ -13,7 +13,6 @@ def create_produits_code_clean(conn: DuckDBPyConnection):
         CREATE OR REPLACE TEMP TABLE produits_dedup AS
         SELECT row_number() over () as id, *
         FROM '{PARQUET_FR}'
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY code ORDER BY completeness DESC) = 1
     """)
 
 
