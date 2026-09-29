@@ -30,10 +30,10 @@ def get_secondary_nutriments(conn_duckdb: DuckDBPyConnection) -> DataFrame :
     :return: Dataframe des nutriments secondaires
     """
     return conn_duckdb.sql("""
-                           SELECT id               as produit_id,
-                                  nutriment.name   AS nom,
+                           SELECT id               as product_id,
+                                  nutriment.name   AS name,
                                   nutriment."100g" AS valeur_100g,
-                                  nutriment.unit   AS unite
+                                  nutriment.unit   AS unit
                            FROM (SELECT id, UNNEST(nutriments_secondaires) AS nutriment
                                  FROM nutriments_extraits)
                            """).df()
@@ -46,9 +46,9 @@ def get_secondary_nutriments_link_table(conn_duckdb: DuckDBPyConnection) -> tupl
     :return: DataFrame des nutriments secondaire et DataFrame de la table de liaison
     """
     df_secondary_nutriments = get_secondary_nutriments(conn_duckdb)
-    id_nm_unit = df_secondary_nutriments[["nom", "unite"]].drop_duplicates(subset="nom").reset_index(
+    id_nm_unit = df_secondary_nutriments[["name", "unit"]].drop_duplicates(subset="name").reset_index(
         drop=True).reset_index(names="id")
-    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["nom", "unite"])[["produit_id", "id", "valeur_100g"]]
+    link_table = df_secondary_nutriments.merge(id_nm_unit, on=["name", "unit"])[["product_id", "id", "valeur_100g"]]
     link_table = link_table.rename(columns={"id": "nutriment_id"}).drop_duplicates(
-        subset=["produit_id", "nutriment_id"])
+        subset=["product_id", "nutriment_id"])
     return id_nm_unit, link_table

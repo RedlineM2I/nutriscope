@@ -1,12 +1,12 @@
-DROP TABLE IF EXISTS produits_nutriments_secondaires CASCADE;
-DROP TABLE IF EXISTS produits_additifs CASCADE;
-DROP TABLE IF EXISTS produits_labels CASCADE;
-DROP TABLE IF EXISTS produits_marques CASCADE;
-DROP TABLE IF EXISTS produits_origines CASCADE;
-DROP TABLE IF EXISTS produits_categories CASCADE;
-DROP TABLE IF EXISTS produits_ingredients CASCADE;
-DROP TABLE IF EXISTS nutriments CASCADE;
-DROP TABLE IF EXISTS produits CASCADE ;
+DROP TABLE IF EXISTS products_secondary_nutriments CASCADE;
+DROP TABLE IF EXISTS products_additives CASCADE;
+DROP TABLE IF EXISTS products_labels CASCADE;
+DROP TABLE IF EXISTS products_brands CASCADE;
+DROP TABLE IF EXISTS products_origins CASCADE;
+DROP TABLE IF EXISTS products_categories CASCADE;
+DROP TABLE IF EXISTS products_ingredients CASCADE;
+DROP TABLE IF EXISTS secondary_nutriments CASCADE;
+DROP TABLE IF EXISTS products CASCADE ;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS origins CASCADE;
 DROP TABLE IF EXISTS additives CASCADE;
@@ -20,6 +20,13 @@ DROP TABLE IF EXISTS nutritional_values CASCADE;
 -- Schéma relationnel OpenFoodFacts (pour dbdiagram.io)
 -- ============================================================
 
+-- Créée avant products, qui référence categories (id)
+CREATE TABLE categories
+(
+    id  SERIAL PRIMARY KEY,
+    name VARCHAR UNIQUE NOT NULL
+);
+
 -- Table principale : un produit par code-barres
 CREATE TABLE products
 (
@@ -27,7 +34,7 @@ CREATE TABLE products
     code                      VARCHAR UNIQUE NOT NULL,
     product_name              VARCHAR,
     quantity                  VARCHAR,
-    main_category             INTEGER REFERENCES categories (id),
+    -- main_category             INTEGER REFERENCES categories (id),
     nutrition_data_per        VARCHAR,
     nutriscore_grade          VARCHAR, -- CHAR(1) CHECK (nutriscore_grade IN ('a','b','c','d','e'))
     nutriscore_score          SMALLINT,
@@ -52,12 +59,6 @@ CREATE TABLE products_brands
     product_id INTEGER REFERENCES products (id),
     brand_id  INTEGER REFERENCES brands (id),
     PRIMARY KEY (product_id, brand_id)
-);
-
-CREATE TABLE categories
-(
-    id  SERIAL PRIMARY KEY,
-    name VARCHAR UNIQUE NOT NULL
 );
 
 CREATE TABLE products_categories
@@ -143,17 +144,17 @@ CREATE TABLE nutritional_values
     fruits_legumes_100g      FLOAT
 );
 
-CREATE TABLE nutriments_secondaires
+CREATE TABLE secondary_nutriments
 (
     id    SMALLINT PRIMARY KEY,
     name   VARCHAR UNIQUE,
     unit VARCHAR
 );
 
-CREATE TABLE products_nutriments_secondary
+CREATE TABLE products_secondary_nutriments
 (
-    produit_id   INTEGER REFERENCES produits (id),
-    nutriment_id SMALLINT REFERENCES nutriments (id),
+    product_id   INTEGER REFERENCES products (id),
+    nutriment_id SMALLINT REFERENCES secondary_nutriments (id),
     valeur_100g  REAL,
     PRIMARY KEY (product_id, nutriment_id)
 );
