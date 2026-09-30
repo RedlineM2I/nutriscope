@@ -1,20 +1,6 @@
 from dataclasses import dataclass, field
-
 import pandas as pd
-
-COLONNES_COMPTEURS = ["nutriscore_score", "nova_group"]
-
-COLONNES_NUTRIMENTS = ["energy_100g",
-                       "sugars_100g",
-                       "carbohydrates_100g",
-                       "fat_100g",
-                       "saturated-fat_100g",
-                       "salt_100g",
-                       "proteins_100g",
-                       "fiber_100g",
-                       "sodium_100g",
-                       "fruits-vegetables-legumes_100g"]
-
+import numpy as np
 
 @dataclass
 class CompteRendu:
@@ -24,6 +10,19 @@ class CompteRendu:
     lignes_touchees: int
     details: dict[str, int] = field(default_factory=dict)
 
+COLONNES_COMPTEURS = ["nutriscore_score", "nova_group"]
+
+COLONNES_NUTRIMENTS = ["energy_100g",
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
 
 def typer_colonnes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     """Fixe les types de colonnes attendus par la suite du pipeline :
@@ -128,4 +127,3 @@ def traiter_categories_vides(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRend
             "inclassables_supprimes": nb_inclassables,
         }
     )
-    return res, cr
