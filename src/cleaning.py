@@ -104,7 +104,7 @@ def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     proteins = pd.to_numeric(res["proteins_100g"], errors="coerce")
     fat = pd.to_numeric(res["fat_100g"], errors="coerce")
 
-    # Le calcul 4/4/9 est possible si au moins un macro est present.
+    # Calcul 4/4/9 (possible si au moins un macronutriment est présent)
     calc = carbs.fillna(0) * 4 + proteins.fillna(0) * 4 + fat.fillna(0) * 9
     has_macros = carbs.notna() | proteins.notna() | fat.notna()
 
@@ -115,18 +115,18 @@ def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
         alcool_mask = pd.Series(False, index=res.index)
     eligible_mask = ~alcool_mask
 
-    # 1) kcal nulles -> recalcul si macros disponibles.
+    # Si kcal nulles -> recalcul si macronutriments disponibles
     nulles_recalculees_mask = eligible_mask & kcal.isna() & has_macros
     kcal.loc[nulles_recalculees_mask] = calc.loc[nulles_recalculees_mask].round(1)
 
-    # 2) kcal > 900 -> recalcul si macros, sinon NA.
+    # Si kcal > 900 -> recalcul si macronurtiments disponibles, sinon NA
     over_900_mask = eligible_mask & kcal.notna() & (kcal > KCAL_MAX)
     over_900_recalculees_mask = over_900_mask & has_macros
     over_900_invalidees_mask = over_900_mask & ~has_macros
     kcal.loc[over_900_recalculees_mask] = calc.loc[over_900_recalculees_mask].round(1)
     kcal.loc[over_900_invalidees_mask] = pd.NA
 
-    # 3) kcal incoherentes > 50% du calcul 4/4/9 si calcul >= 50.
+    # Si kcal incoherentes > 50% du calcul 4/4/9 si calcul >= 50.
     calc_eligible_mask = has_macros & (calc >= 50)
     ecart_relatif = (kcal - calc).abs() / calc.where(calc != 0)
     incoherentes_recalculees_mask = (
@@ -140,7 +140,7 @@ def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
 
     res["energy-kcal_100g"] = kcal
 
-    # 4) realignement des kJ depuis kcal finales.
+    # Réalignement des kJ depuis kcal finales.
     kj.loc[kcal.notna()] = (kcal.loc[kcal.notna()] * KJ_PER_KCAL).round(1)
     res["energy_100g"] = kj
 
