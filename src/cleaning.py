@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Dict, Tuple
 
 import pandas as pd
 
@@ -18,9 +19,10 @@ class CompteRendu:
     lignes_avant: int
     lignes_apres: int
     lignes_touchees: int
-    details: dict[str, int] = field(default_factory=dict)
+    details: Dict[str, int] = field(default_factory=dict)
     
-def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+    
+def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
     """Règle de normalisation des unités :
     - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal 
       sort de l'intervalle [3,9 ; 4,5]
@@ -31,10 +33,10 @@ def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
 
     lignes_avant = len(df)
 
-    kj = res["energy_100g"]
-    kcal = res["energy-kcal_100g"]
-    sel = res["salt_100g"]
-    sodium = res["sodium_100g"]
+    kj = res["energy_100g"].copy()
+    kcal = res["energy-kcal_100g"].copy()
+    sel = res["salt_100g"].copy()
+    sodium = res["sodium_100g"].copy()
 
     # Calcul de kcal depuis kJ si absent
     kcal_derivees_mask = kcal.isna() & kj.notna()
@@ -86,7 +88,7 @@ def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     return res, compte_rendu
     
 
-def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
     """Règle de bornage des nutriments :
     - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
     - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
@@ -96,7 +98,7 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     res = df.copy(deep=True)
 
     lignes_avant = len(df)
-    details: dict[str, int] = {}
+    details: Dict[str, int] = {}
 
     colonnes_nutriments = [
         "carbohydrates_100g",
@@ -116,7 +118,7 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
         if col not in res.columns:
             continue
 
-        serie = pd.to_numeric(res[col], errors="coerce")
+        serie = pd.to_numeric(res[col], errors="coerce").copy()
         borne_max = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
 
         negatifs_mask = serie < 0
@@ -133,7 +135,7 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     # Cohérence sucres vs glucides
     sucres_mask = pd.Series(False, index=res.index)
     if "sugars_100g" in res.columns and "carbohydrates_100g" in res.columns:
-        sucres = pd.to_numeric(res["sugars_100g"], errors="coerce")
+        sucres = pd.to_numeric(res["sugars_100g"], errors="coerce").copy()
         glucides = pd.to_numeric(res["carbohydrates_100g"], errors="coerce")
         sucres_mask = sucres.notna() & glucides.notna() & (sucres > glucides + COHERENCE_DELTA)
         sucres.loc[sucres_mask] = pd.NA
@@ -143,7 +145,7 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     # Cohérence saturés vs lipides
     satures_mask = pd.Series(False, index=res.index)
     if "saturated-fat_100g" in res.columns and "fat_100g" in res.columns:
-        satures = pd.to_numeric(res["saturated-fat_100g"], errors="coerce")
+        satures = pd.to_numeric(res["saturated-fat_100g"], errors="coerce").copy()
         lipides = pd.to_numeric(res["fat_100g"], errors="coerce")
         satures_mask = satures.notna() & lipides.notna() & (satures > lipides + COHERENCE_DELTA)
         satures.loc[satures_mask] = pd.NA
@@ -163,7 +165,7 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
 
     return res, compte_rendu
     
-def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
     """Règle de correction de l'énergie :
     - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9
     - Pareil pour les kcal supérieurs à 900, si imposssible : NA
@@ -175,8 +177,8 @@ def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
 
     lignes_avant = len(df)
 
-    kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce")
-    kj = pd.to_numeric(res["energy_100g"], errors="coerce")
+    kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce").copy()
+    kj = pd.to_numeric(res["energy_100g"], errors="coerce").copy()
     carbs = pd.to_numeric(res["carbohydrates_100g"], errors="coerce")
     proteins = pd.to_numeric(res["proteins_100g"], errors="coerce")
     fat = pd.to_numeric(res["fat_100g"], errors="coerce")
