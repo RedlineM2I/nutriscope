@@ -1,11 +1,11 @@
-DROP TABLE IF EXISTS products_secondary_nutriments CASCADE;
+DROP TABLE IF EXISTS products_secondary_nutrients CASCADE;
 DROP TABLE IF EXISTS products_additives CASCADE;
 DROP TABLE IF EXISTS products_labels CASCADE;
 DROP TABLE IF EXISTS products_brands CASCADE;
 DROP TABLE IF EXISTS products_origins CASCADE;
 DROP TABLE IF EXISTS products_categories CASCADE;
 DROP TABLE IF EXISTS products_ingredients CASCADE;
-DROP TABLE IF EXISTS secondary_nutriments CASCADE;
+DROP TABLE IF EXISTS secondary_nutrients CASCADE;
 DROP TABLE IF EXISTS products CASCADE ;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS origins CASCADE;
@@ -17,35 +17,43 @@ DROP TABLE IF EXISTS ingredients CASCADE;
 DROP TABLE IF EXISTS nutritional_values CASCADE;
 
 -- ============================================================
--- Schéma relationnel OpenFoodFacts (pour dbdiagram.io)
+-- OpenFoodFacts relational schema (for dbdiagram.io)
 -- ============================================================
 
--- Créée avant products, qui référence categories (id)
+-- Created before products, which references categories (id)
 CREATE TABLE categories
 (
     id  SERIAL PRIMARY KEY,
     name VARCHAR UNIQUE NOT NULL
 );
 
--- Table principale : un produit par code-barres
+-- Main table: one product per barcode
 CREATE TABLE products
 (
     id                        SERIAL PRIMARY KEY,
     code                      VARCHAR UNIQUE NOT NULL,
     product_name              VARCHAR,
     quantity                  VARCHAR,
-    -- main_category             INTEGER REFERENCES categories (id),
+    main_category             INTEGER REFERENCES categories (id),
+    foodgroup_id             INTEGER REFERENCES foodgroups (id),
     nutrition_data_per        VARCHAR,
     nutriscore_grade          VARCHAR, -- CHAR(1) CHECK (nutriscore_grade IN ('a','b','c','d','e'))
     nutriscore_score          SMALLINT,
     nova_group                SMALLINT CHECK (nova_group BETWEEN 1 AND 4),
     completeness              REAL,
     environmental_score_grade VARCHAR, -- CHAR(1) CHECK (environmental_score_grade IN ('a','b','c','d','e'))
-    environmental_score_score SMALLINT
+    environmental_score_score SMALLINT,
+    last_modified_t           DATETIME
+);
+
+CREATE TABLE foodgroups
+(
+    id  SERIAL PRIMARY KEY,
+    name VARCHAR UNIQUE NOT NULL
 );
 
 -- ============================================================
--- Classification (relations many-to-many via tables de liaison)
+-- Classification (many-to-many relations via link tables)
 -- ============================================================
 
 CREATE TABLE brands
@@ -64,8 +72,8 @@ CREATE TABLE products_brands
 CREATE TABLE products_categories
 (
     product_id   INTEGER REFERENCES products (id),
-    categorie_id INTEGER REFERENCES categories (id),
-    PRIMARY KEY (product_id, categorie_id)
+    category_id INTEGER REFERENCES categories (id),
+    PRIMARY KEY (product_id, category_id)
 
 );
 
@@ -96,7 +104,7 @@ CREATE TABLE products_origins
 );
 
 -- ============================================================
--- Ingrédients
+-- Ingredients
 -- ============================================================
 
 CREATE TABLE ingredients
@@ -126,41 +134,41 @@ CREATE TABLE products_additives
 );
 
 -- ============================================================
--- Nutrition (un produit a plusieurs lignes de nutriments)
+-- Nutrition (one product has several nutrient rows)
 -- ============================================================
 
 CREATE TABLE nutritional_values
 (
-    product_id               INTEGER REFERENCES products (id),
-    energie_100g             FLOAT, --En kJ
-    matieres_grasses_100g    FLOAT,
-    acides_gras_satures_100g FLOAT,
-    glucides_100g            FLOAT,
-    sucres_100g              FLOAT,
-    fibres_100g              FLOAT,
-    proteines_100g           FLOAT,
-    sel_100g                 FLOAT,
-    fruits_nuts_100g         FLOAT,
-    fruits_legumes_100g      FLOAT
+    product_id          INTEGER REFERENCES products (id),
+    energy_100g         FLOAT, -- in kJ
+    fat_100g            FLOAT,
+    saturated_fat_100g  FLOAT,
+    carbohydrates_100g  FLOAT,
+    sugars_100g         FLOAT,
+    fiber_100g          FLOAT,
+    proteins_100g       FLOAT,
+    salt_100g           FLOAT,
+    fruits_nuts_100g    FLOAT,
+    fruits_legumes_100g FLOAT
 );
 
-CREATE TABLE secondary_nutriments
+CREATE TABLE secondary_nutrients
 (
     id    SMALLINT PRIMARY KEY,
     name   VARCHAR UNIQUE,
     unit VARCHAR
 );
 
-CREATE TABLE products_secondary_nutriments
+CREATE TABLE products_secondary_nutrients
 (
     product_id   INTEGER REFERENCES products (id),
-    nutriment_id SMALLINT REFERENCES secondary_nutriments (id),
-    valeur_100g  REAL,
-    PRIMARY KEY (product_id, nutriment_id)
+    nutrient_id SMALLINT REFERENCES secondary_nutrients (id),
+    value_100g  REAL,
+    PRIMARY KEY (product_id, nutrient_id)
 );
 
 -- ============================================================
--- Images (plusieurs photos par produit)
+-- Images (several photos per product)
 -- ============================================================
 
 CREATE TABLE images

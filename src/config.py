@@ -37,6 +37,7 @@ COLUMNS = [
     "categories_tags",
     "labels_tags",
     "origins_tags",
+    "food_groups_tags",
 
     # Ingrédients
     "ingredients_tags",

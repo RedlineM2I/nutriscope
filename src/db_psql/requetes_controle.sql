@@ -26,8 +26,8 @@ UNION ALL SELECT 'products_ingredients', COUNT(*) FROM products_ingredients
 UNION ALL SELECT 'additives', COUNT(*) FROM additives
 UNION ALL SELECT 'products_additives', COUNT(*) FROM products_additives
 UNION ALL SELECT 'nutritional_values', COUNT(*) FROM nutritional_values
-UNION ALL SELECT 'secondary_nutriments', COUNT(*) FROM secondary_nutriments
-UNION ALL SELECT 'products_secondary_nutriments', COUNT(*) FROM products_secondary_nutriments
+UNION ALL SELECT 'secondary_nutrients', COUNT(*) FROM secondary_nutrients
+UNION ALL SELECT 'products_secondary_nutrients', COUNT(*) FROM products_secondary_nutrients
 UNION ALL SELECT 'images', COUNT(*) FROM images
 ORDER BY row_count DESC;
 
@@ -41,13 +41,13 @@ SELECT
     ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM products), 1) AS share_pct
 FROM products p
 LEFT JOIN products_categories pc ON pc.product_id = p.id
-WHERE pc.categorie_id IS NULL;
+WHERE pc.category_id IS NULL;
 
 -- Détail (échantillon à inspecter à la main)
 -- SELECT p.id, p.code, p.product_name
 -- FROM products p
 -- LEFT JOIN products_categories pc ON pc.product_id = p.id
--- WHERE pc.categorie_id IS NULL
+-- WHERE pc.category_id IS NULL
 -- LIMIT 50;
 
 
@@ -89,7 +89,7 @@ SELECT
     COUNT(p.nutriscore_grade)                                          AS nb_with_nutriscore,
     ROUND(100.0 * COUNT(p.nutriscore_grade) / NULLIF(COUNT(p.id), 0), 2) AS completeness_pct
 FROM aisles a
-JOIN products_categories pc ON pc.categorie_id = a.id
+JOIN products_categories pc ON pc.category_id = a.id
 JOIN products p ON p.id = pc.product_id
 GROUP BY a.name
 ORDER BY completeness_pct ASC;

@@ -32,7 +32,8 @@ def build_link_table(conn_duckdb: DuckDBPyConnection, source_column: str, column
     link = get_id_tag_nm_table(conn_duckdb, source_column, column_name)
     id_tag_nm_table = link[[column_name]].drop_duplicates().reset_index(drop=True).reset_index(names="id")
 
-    fk_column = f"{table_name[:-1]}_id"
+    singular = f"{table_name[:-3]}y" if table_name.endswith("ies") else table_name[:-1]
+    fk_column = f"{singular}_id"
 
     link_table = link.merge(id_tag_nm_table, on=column_name)[["product_id", "id"]]
     link_table = link_table.rename(columns={"id": fk_column})
