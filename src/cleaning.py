@@ -47,7 +47,7 @@ def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     )
     kcal.loc[kcal_recalculees_mask] = (kj.loc[kcal_recalculees_mask] / KJ_PER_KCAL).round(1)
 
-    # 3) Derivations sel <-> sodium dans les deux sens.
+    # Dérivations sel <-> sodium dans les deux sens
     sel_derive_mask = sel.isna() & sodium.notna()
     sel.loc[sel_derive_mask] = (sodium.loc[sel_derive_mask] * SALT_PER_SODIUM).round(4)
 
@@ -87,11 +87,81 @@ def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     """"""
     
 def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    """"""
-    res = df.copy()
-    calc = 4 * res["carbohydrates_100g"] + 4 * res["proteins_100g"] + 9 * res["fat_100g"]
-    depuis_macros = kcal.isna() & calc.notna() & (calc <= KCAL_MAX)
-    kcal = kcal.mask(depuis_macros, calc.round(1))
+    """Règle de correction de l'énergie :
+    - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9.
+    - Pareil pour les kcal supérieurs à 900, si imposssible : NA.
+    - Si des valeur kcal sont incohérentes (> 50% d'écart vs calcul 4/4/9 ou si calcul >= 50) : on recalcule.
+    - Aucune correction sur le rayon Alcoholic beverages.
+    - kJ réalignés sur les kcal finales.
+    """
+    res = df.copy(deep=True)
+
+    lignes_avant = len(df)
+
+    kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce")
+    kj = pd.to_numeric(res["energy_100g"], errors="coerce")
+    carbs = pd.to_numeric(res["carbohydrates_100g"], errors="coerce")
+    proteins = pd.to_numeric(res["proteins_100g"], errors="coerce")
+    fat = pd.to_numeric(res["fat_100g"], errors="coerce")
+
+    # Le calcul 4/4/9 est possible si au moins un macro est present.
+    calc = carbs.fillna(0) * 4 + proteins.fillna(0) * 4 + fat.fillna(0) * 9
+    has_macros = carbs.notna() | proteins.notna() | fat.notna()
+
+    # Exception rayon alcool.
+    if "rayon" in res.columns:
+        alcool_mask = res["rayon"].astype("string").eq("Alcoholic beverages")
+    else:
+        alcool_mask = pd.Series(False, index=res.index)
+    eligible_mask = ~alcool_mask
+
+    # 1) kcal nulles -> recalcul si macros disponibles.
+    nulles_recalculees_mask = eligible_mask & kcal.isna() & has_macros
+    kcal.loc[nulles_recalculees_mask] = calc.loc[nulles_recalculees_mask].round(1)
+
+    # 2) kcal > 900 -> recalcul si macros, sinon NA.
+    over_900_mask = eligible_mask & kcal.notna() & (kcal > KCAL_MAX)
+    over_900_recalculees_mask = over_900_mask & has_macros
+    over_900_invalidees_mask = over_900_mask & ~has_macros
+    kcal.loc[over_900_recalculees_mask] = calc.loc[over_900_recalculees_mask].round(1)
+    kcal.loc[over_900_invalidees_mask] = pd.NA
+
+    # 3) kcal incoherentes > 50% du calcul 4/4/9 si calcul >= 50.
+    calc_eligible_mask = has_macros & (calc >= 50)
+    ecart_relatif = (kcal - calc).abs() / calc.where(calc != 0)
+    incoherentes_recalculees_mask = (
+        eligible_mask
+        & kcal.notna()
+        & calc_eligible_mask
+        & (ecart_relatif > 0.5)
+        & ~over_900_mask
+    )
+    kcal.loc[incoherentes_recalculees_mask] = calc.loc[incoherentes_recalculees_mask].round(1)
+
     res["energy-kcal_100g"] = kcal
-    
-    
+
+    # 4) realignement des kJ depuis kcal finales.
+    kj.loc[kcal.notna()] = (kcal.loc[kcal.notna()] * KJ_PER_KCAL).round(1)
+    res["energy_100g"] = kj
+
+    lignes_touchees_mask = (
+        nulles_recalculees_mask
+        | over_900_recalculees_mask
+        | over_900_invalidees_mask
+        | incoherentes_recalculees_mask
+    )
+
+    compte_rendu = CompteRendu(
+        regle="fix_energy",
+        lignes_avant=lignes_avant,
+        lignes_apres=len(res),
+        lignes_touchees=int(lignes_touchees_mask.sum()),
+        details={
+            "nulles_recalculees": int(nulles_recalculees_mask.sum()),
+            ">900_recalculees": int(over_900_recalculees_mask.sum()),
+            ">900_invalidees": int(over_900_invalidees_mask.sum()),
+            "incoherentes_recalculees": int(incoherentes_recalculees_mask.sum()),
+        },
+    )
+
+    return res, compte_rendu
