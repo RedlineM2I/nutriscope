@@ -8,6 +8,9 @@ KJ_PER_KCAL = 4.184
 
 RATIO_KCAL_LOW = 3.9
 RATIO_KCAL_HIGH = 4.5
+NUTRIMENT_MAX = 100.0
+SODIUM_MAX = 40.0
+COHERENCE_DELTA = 0.5
 
 @dataclass
 class CompteRendu:
@@ -18,7 +21,7 @@ class CompteRendu:
     details: dict[str, int] = field(default_factory=dict)
     
 def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    """Règle de normalisation des unités:
+    """Règle de normalisation des unités :
     - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal 
       sort de l'intervalle [3,9 ; 4,5]
     - Calcule le sel ou le sodium si l'un est manquant (sel = sodium x 2,5), et recalcule le sodium depuis le sel s'il est incohérent""" 
@@ -84,15 +87,89 @@ def normalize_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     
 
 def limit_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    """"""
+    """Règle de bornage des nutriments :
+    - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
+    - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
+    - Si sucres > glucides + 0,5 -> sucres = NA.
+    - Si saturés > lipides + 0,5 -> saturés = NA.
+    """
+    res = df.copy(deep=True)
+
+    lignes_avant = len(df)
+    details: dict[str, int] = {}
+
+    colonnes_nutriments = [
+        "carbohydrates_100g",
+        "sugars_100g",
+        "fat_100g",
+        "saturated-fat_100g",
+        "salt_100g",
+        "sodium_100g",
+        "proteins_100g",
+        "fiber_100g",
+    ]
+
+    # Nombre de lignes touchées (au moins une modification sur la ligne).
+    lignes_touchees_mask = pd.Series(False, index=res.index)
+
+    for col in colonnes_nutriments:
+        if col not in res.columns:
+            continue
+
+        serie = pd.to_numeric(res[col], errors="coerce")
+        borne_max = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
+
+        negatifs_mask = serie < 0
+        au_dessus_mask = serie > borne_max
+        invalides_mask = negatifs_mask | au_dessus_mask
+
+        serie.loc[invalides_mask] = pd.NA
+        res[col] = serie
+
+        lignes_touchees_mask |= invalides_mask
+        details[f"{col}_negatifs"] = int(negatifs_mask.sum())
+        details[f"{col}_au_dessus"] = int(au_dessus_mask.sum())
+
+    # Cohérence sucres vs glucides
+    sucres_mask = pd.Series(False, index=res.index)
+    if "sugars_100g" in res.columns and "carbohydrates_100g" in res.columns:
+        sucres = pd.to_numeric(res["sugars_100g"], errors="coerce")
+        glucides = pd.to_numeric(res["carbohydrates_100g"], errors="coerce")
+        sucres_mask = sucres.notna() & glucides.notna() & (sucres > glucides + COHERENCE_DELTA)
+        sucres.loc[sucres_mask] = pd.NA
+        res["sugars_100g"] = sucres
+        lignes_touchees_mask |= sucres_mask
+
+    # Cohérence saturés vs lipides
+    satures_mask = pd.Series(False, index=res.index)
+    if "saturated-fat_100g" in res.columns and "fat_100g" in res.columns:
+        satures = pd.to_numeric(res["saturated-fat_100g"], errors="coerce")
+        lipides = pd.to_numeric(res["fat_100g"], errors="coerce")
+        satures_mask = satures.notna() & lipides.notna() & (satures > lipides + COHERENCE_DELTA)
+        satures.loc[satures_mask] = pd.NA
+        res["saturated-fat_100g"] = satures
+        lignes_touchees_mask |= satures_mask
+
+    details["sucres"] = int(sucres_mask.sum())
+    details["satures"] = int(satures_mask.sum())
+
+    compte_rendu = CompteRendu(
+        regle="limit_nutriments",
+        lignes_avant=lignes_avant,
+        lignes_apres=len(res),
+        lignes_touchees=int(lignes_touchees_mask.sum()),
+        details=details,
+    )
+
+    return res, compte_rendu
     
 def fix_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     """Règle de correction de l'énergie :
-    - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9.
-    - Pareil pour les kcal supérieurs à 900, si imposssible : NA.
-    - Si des valeur kcal sont incohérentes (> 50% d'écart vs calcul 4/4/9 ou si calcul >= 50) : on recalcule.
-    - Aucune correction sur le rayon Alcoholic beverages.
-    - kJ réalignés sur les kcal finales.
+    - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9
+    - Pareil pour les kcal supérieurs à 900, si imposssible : NA
+    - Si des valeur kcal sont incohérentes (> 50% d'écart vs calcul 4/4/9 ou si calcul >= 50) : on recalcule
+    - Aucune correction sur le rayon Alcoholic beverages
+    - kJ réalignés sur les kcal finales
     """
     res = df.copy(deep=True)
 
