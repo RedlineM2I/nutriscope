@@ -10,35 +10,6 @@ class CompteRendu:
     lignes_touchees: int
     details: dict[str, int] = field(default_factory=dict)
 
-def run(df: pd.DataFrame):
-    pass
-
-
-def normalise_units(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    cr = CompteRendu("Empty", 0, 0, 0)
-    return df, cr
-
-
-def clip_nutriments(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    cr = CompteRendu("Empty", 0, 0, 0)
-    return df, cr
-
-
-def correct_energy(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    cr = CompteRendu("Empty", 0, 0, 0)
-    return df, cr
-
-
-def drop_duplicates_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    cr = CompteRendu("Empty", 0, 0, 0)
-    return df, cr
-
-
-def treat_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
-    cr = CompteRendu("Empty", 0, 0, 0)
-    return df, cr
-
-
 COLONNES_COMPTEURS = ["nutriscore_score", "nova_group"]
 
 COLONNES_NUTRIMENTS = ["energy_100g",
@@ -52,7 +23,6 @@ COLONNES_NUTRIMENTS = ["energy_100g",
     "sodium_100g",
     "fruits-vegetables-legumes_100g"
 ]
-
 
 def typer_colonnes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     """Fixe les types de colonnes attendus par la suite du pipeline :
@@ -84,8 +54,8 @@ def dedupliquer_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     et ne garde qu'une fiche par code : en cas de doublon, on retient
     la plus complète (`completeness` la plus haute), puis en cas d'égalité
     la plus récente (`last_modified_t` le plus grand).
-    :param df:
-    :return:
+    :param df: DataFrame à nettoyer
+    :return: DataFrame nettoyé et compte rendu de ce qui a été modifié
     """
     res = df.copy()
     res["code"] = res["code"].str.strip()
@@ -114,3 +84,46 @@ def dedupliquer_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
         }
     )
     return res, cr
+
+
+def traiter_categories_vides(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+    """
+    Ajout de 'main_category' dérivé du dernier tag de 'categories_tags'
+    Ajout d'un drapeau 'category_empty' pour les categories vides
+    Ajout d'une colonne 'food_group' pour le rayon dérivé du premier élément de 'food_groups_tags'
+    ayant 'unknown pour les rayons vide
+    Suppression de tous les produits ayant une categorie vide et un rayon unknown
+    :param df: DataFrame à nettoyer
+    :return: DataFrame nettoyé et compte rendu de ce qui a été modifié
+    """
+    res = df.copy()
+
+    #Ajoute 'main_category' et un drapeau
+    res["main_category"] = res["categories_tags"].str[-1]
+    res["category_empty"] = res["main_category"].isna()
+    nb_category_empty = int(res["category_empty"].sum())
+
+    #Nettoie le food_group
+    food_group_sale = res["food_groups_tags"].str[0]
+    nb_food_group_vide = int(food_group_sale.isna().sum())
+    res["food_group"] = food_group_sale.fillna("unknown")
+
+    drop_mask = res["category_empty"] & (res["food_group"] == "unknown")
+    nb_inclassables = int(drop_mask.sum())
+
+    lignes_touchees = int((res["category_empty"] | (res["food_group"] == "unknown")).sum())
+
+    res = res[~drop_mask]
+
+    cr = CompteRendu(
+        regle="traiter_categories_vides",
+        lignes_avant=len(df),
+        lignes_apres=len(res),
+        lignes_touchees=lignes_touchees,
+        details={
+            "categorie_vide": nb_category_empty,
+            "food_group_derive_de_vide": nb_food_group_vide,
+            "food_group_unknown_total": int((res["food_group"] == "unknown").sum()) + nb_inclassables,
+            "inclassables_supprimes": nb_inclassables,
+        }
+    )
