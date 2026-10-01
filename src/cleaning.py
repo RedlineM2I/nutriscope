@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
-import pandas as pd
-from models import CompteRendu
+from src.models import CompteRendu
 from src.strategie import DEFAULT_STRATEGY
+
+import pandas as pd
 
 KCAL_MAX = 900.0
 SALT_PER_SODIUM = 2.5
