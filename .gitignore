@@ -215,3 +215,5 @@ data/*.parquet
 
 # Notebooks de brouillon
 notebooks/drafts/
+
+src/drafts

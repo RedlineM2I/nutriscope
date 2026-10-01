@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, Engine
 # Environnement SQL
 load_dotenv()
 
+
 def get_engine() -> Engine:
     """
     Crée un engine sqlalchemy à partir des informations de la base postgresql à utiliser dans le '.env'

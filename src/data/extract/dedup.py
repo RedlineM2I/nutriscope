@@ -2,7 +2,8 @@ from _duckdb import DuckDBPyConnection
 
 from src.config import PARQUET_FR
 
-def create_produits_code_clean(conn : DuckDBPyConnection) :
+
+def create_produits_code_clean(conn: DuckDBPyConnection):
     """
     Crée une table temporaire propre des produits à partir du fichier parquet
     :param conn: Connexion à la base duckdb
@@ -15,7 +16,8 @@ def create_produits_code_clean(conn : DuckDBPyConnection) :
         QUALIFY ROW_NUMBER() OVER (PARTITION BY code ORDER BY completeness DESC) = 1
     """)
 
-def create_nutriments_extraits(conn : DuckDBPyConnection) :
+
+def create_nutriments_extraits(conn: DuckDBPyConnection):
     """
     Crée une table temporaire propre des nutriments à partir du fichier parquet
     :param conn: Connexion à la base duckdb

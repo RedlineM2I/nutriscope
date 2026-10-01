@@ -5,8 +5,8 @@ DROP TABLE IF EXISTS produits_marques CASCADE;
 DROP TABLE IF EXISTS produits_origines CASCADE;
 DROP TABLE IF EXISTS produits_categories CASCADE;
 DROP TABLE IF EXISTS produits_ingredients CASCADE;
-DROP TABLE IF EXISTS nutriments CASCADE;
-DROP TABLE IF EXISTS produits CASCADE ;
+DROP TABLE IF EXISTS nutriments_secondaires CASCADE;
+DROP TABLE IF EXISTS produits CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS origines CASCADE;
 DROP TABLE IF EXISTS additifs CASCADE;
@@ -142,7 +142,7 @@ CREATE TABLE valeurs_nutritionnelles
     fruits_legumes_100g      FLOAT
 );
 
-CREATE TABLE nutriments
+CREATE TABLE nutriments_secondaires
 (
     id    SMALLINT PRIMARY KEY,
     nom   VARCHAR UNIQUE,
@@ -152,7 +152,7 @@ CREATE TABLE nutriments
 CREATE TABLE produits_nutriments_secondaires
 (
     produit_id   INTEGER REFERENCES produits (id),
-    nutriment_id SMALLINT REFERENCES nutriments (id),
+    nutriment_id SMALLINT REFERENCES nutriments_secondaires (id),
     valeur_100g  REAL,
     PRIMARY KEY (produit_id, nutriment_id)
 );
