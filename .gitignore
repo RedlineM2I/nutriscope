@@ -212,6 +212,9 @@ __marimo__/
 
 # Data files
 data/*.parquet
+data/*.mp3
+data/export*.parquet
+data/export
 
 # Notebooks de brouillon
 notebooks/drafts/

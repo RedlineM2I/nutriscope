@@ -1,7 +1,7 @@
-from pathlib import Path
+"""Chemins du projet et constantes métier."""
 
-import time
-import functools
+from enum import StrEnum
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 
@@ -9,42 +9,20 @@ PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
 CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 
-SCRIPT_CREATION = f"{BASE_DIR.parent}/src/data/db/create_tables.sql"
+SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
+
+ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
+
+EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
 
 
-def timer(func=None, *, label=None, store=None):
-    """
-    Mesure le temps d'exécution.
-
-    Utilisable de 4 façons :
-        @timer
-        @timer(label="chargement")
-        @timer(store=timings)             # timings[nom] = durée (dict fourni)
-        @timer(label="load", store=timings)
-
-    Fonctionne sur n'importe quelle fonction OU méthode (grâce à *args/**kwargs
-    et functools.wraps). Le temps est loggué même si la fonction lève.
-    """
-
-    def decorator(fn):
-        name = label or fn.__qualname__  # __qualname__ => "Classe.methode"
-
-        @functools.wraps(fn)  # garde nom, docstring, signature
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            try:
-                return fn(*args, **kwargs)
-            finally:
-                duration = time.perf_counter() - start
-                print(f"[{name}] {duration:.3f} s")
-                if store is not None:
-                    store[name] = duration
-
-        return wrapper
-
-    # @timer          -> func est la fonction        -> on décore tout de suite
-    # @timer(...)      -> func est None              -> on renvoie le décorateur
-    return decorator(func) if callable(func) else decorator
+class Tag(StrEnum):
+    CATEGORIE = "categorie"
+    ORIGIN = "origin"
+    LABEL = "label"
+    ADDITIVE = "additive"
+    BRAND = "brand"
+    INGREDIENT = "ingredient"
 
 
 COLUMNS = [
@@ -59,6 +37,7 @@ COLUMNS = [
     "categories_tags",
     "labels_tags",
     "origins_tags",
+    "food_groups_tags",
 
     # Ingrédients
     "ingredients_tags",
