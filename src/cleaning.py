@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
 import pandas as pd
+from models import CompteRendu
 from src.strategie import DEFAULT_STRATEGY
 
 KCAL_MAX = 900.0
@@ -26,15 +27,6 @@ KEY_NUTRIENTS = ["energy_100g",
                  "fiber_100g",
                  "sodium_100g",
                  "fruits-vegetables-legumes_100g"]
-
-
-@dataclass
-class CompteRendu:
-    regle: str
-    lignes_avant: int
-    lignes_apres: int
-    lignes_touchees: int
-    details: dict[str, int] = field(default_factory=dict)
       
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
@@ -366,7 +358,7 @@ def traiter_categories_vides(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRend
     return res, cr
 
 
-def _apply_flag(df: pd.DataFrame, column: str) -> tuple[DataFrame, int]:
+def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """Crée `<colonne>_empty` (booléen) sans toucher à la colonne d'origine.
     Retourne le nombre de valeurs manquantes détectées.
     """
@@ -376,7 +368,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[DataFrame, int]:
     return res, int(mask.sum())
 
 
-def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> int | tuple[DataFrame, int]:
+def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> int | tuple[pd.DataFrame, int]:
     """Remplace les manquants de `colonne` par une constante, castée au dtype
     de la colonne pour éviter de polluer une colonne numérique avec une string.
     """
@@ -390,7 +382,7 @@ def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> int | tupl
     return res, nb_missing
 
 
-def _apply_median_by_department(df: pd.DataFrame, column: str) -> int | tuple[DataFrame, int]:
+def _apply_median_by_department(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]:
     """Remplace chaque manquant par la médiane de son propre rayon (`res['rayon']`).
     Usage applicatif uniquement (affichage/substitution) : ne remplace pas
     l'imputation ML, qui se fait après le split, dans le pipeline dédié.
@@ -404,7 +396,7 @@ def _apply_median_by_department(df: pd.DataFrame, column: str) -> int | tuple[Da
     return res, nb_missing
 
 
-def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[DataFrame, int]:
+def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]:
     """Remplace les manquants par la valeur la plus fréquente de la colonne.
     En cas d'égalité entre plusieurs modes, la première (ordre pandas) est retenue.
     """
