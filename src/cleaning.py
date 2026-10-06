@@ -18,23 +18,23 @@ CONSISTENCY_DELTA = 0.5
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
 KEY_NUTRIENTS = ["energy_100g",
-    "sugars_100g",
-    "carbohydrates_100g",
-    "fat_100g",
-    "saturated-fat_100g",
-    "salt_100g",
-    "proteins_100g",
-    "fiber_100g",
-    "sodium_100g",
-    "fruits-vegetables-legumes_100g"
-]
-      
+                 "sugars_100g",
+                 "carbohydrates_100g",
+                 "fat_100g",
+                 "saturated-fat_100g",
+                 "salt_100g",
+                 "proteins_100g",
+                 "fiber_100g",
+                 "sodium_100g",
+                 "fruits-vegetables-legumes_100g"
+                 ]
+
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de normalisation des unités :
-    - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal 
+    - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal
       sort de l'intervalle [3,9 ; 4,5]
-    - Calcule le sel ou le sodium si l'un est manquant (sel = sodium x 2,5), et recalcule le sodium depuis le sel s'il est incohérent""" 
+    - Calcule le sel ou le sodium si l'un est manquant (sel = sodium x 2,5), et recalcule le sodium depuis le sel s'il est incohérent"""
 
     # Copie de df
     res = df.copy()
@@ -53,10 +53,10 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     # Recalcul de kcal si ratio kJ/kcal hors de l'interval [3.9 ; 4.5].
     ratio_kj_kcal = kj / kcal
     kcal_recomputed_mask = (
-        kj.notna()
-        & kcal.notna()
-        & (kcal != 0)
-        & ((ratio_kj_kcal < RATIO_KCAL_LOW) | (ratio_kj_kcal > RATIO_KCAL_HIGH))
+            kj.notna()
+            & kcal.notna()
+            & (kcal != 0)
+            & ((ratio_kj_kcal < RATIO_KCAL_LOW) | (ratio_kj_kcal > RATIO_KCAL_HIGH))
     )
     kcal.loc[kcal_recomputed_mask] = (kj.loc[kcal_recomputed_mask] / KJ_PER_KCAL).round(1)
 
@@ -69,7 +69,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     # Sodium recalculé depuis le sel si incoherent.
     sodium_recomputed_mask = (
-        sodium.notna() & sel.notna() & ~sodium_derived_mask & ((sel - sodium * SALT_PER_SODIUM).abs() > 1e-6)
+            sodium.notna() & sel.notna() & ~sodium_derived_mask & ((sel - sodium * SALT_PER_SODIUM).abs() > 1e-6)
     )
     sodium.loc[sodium_recomputed_mask] = (sel.loc[sodium_recomputed_mask] / SALT_PER_SODIUM).round(4)
 
@@ -77,13 +77,14 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     res["salt_100g"] = sel
     res["sodium_100g"] = sodium
 
-    touched_rows = (kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
+    touched_rows = (
+                kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
 
     report = Report(
-        regle="normalize_units",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows),
+        rule="normalize_units",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows),
         details={
             "kcal_derivees": int(kcal_derived_mask.sum()),
             "kcal_recalculees": int(kcal_recomputed_mask.sum()),
@@ -94,7 +95,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     )
 
     return res, report
-    
+
 
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
@@ -164,15 +165,16 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     details["satures"] = int(saturated_inconsistent_mask.sum())
 
     report = Report(
-        regle="limit_nutriments",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="limit_nutriments",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details=details,
     )
 
     return res, report
-    
+
+
 def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de correction de l'énergie :
     - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9
@@ -217,11 +219,11 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     calc_eligible_mask = has_macros & (calc >= 50)
     relative_gap = (kcal - calc).abs() / calc.where(calc != 0)
     inconsistent_recomputed_mask = (
-        eligible_mask
-        & kcal.notna()
-        & calc_eligible_mask
-        & (relative_gap > 0.5)
-        & ~over_900_mask
+            eligible_mask
+            & kcal.notna()
+            & calc_eligible_mask
+            & (relative_gap > 0.5)
+            & ~over_900_mask
     )
     kcal.loc[inconsistent_recomputed_mask] = calc.loc[inconsistent_recomputed_mask].round(1)
 
@@ -232,17 +234,17 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     res["energy_100g"] = kj
 
     touched_rows_mask = (
-        missing_kcal_recomputed_mask
-        | over_900_recomputed_mask
-        | over_900_invalidated_mask
-        | inconsistent_recomputed_mask
+            missing_kcal_recomputed_mask
+            | over_900_recomputed_mask
+            | over_900_invalidated_mask
+            | inconsistent_recomputed_mask
     )
 
     report = Report(
-        regle="fix_energy",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="fix_energy",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details={
             "nulles_recalculees": int(missing_kcal_recomputed_mask.sum()),
             ">900_recalculees": int(over_900_recomputed_mask.sum()),
@@ -410,7 +412,8 @@ def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]
     return res, nb_missing
 
 
-def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT_STRATEGY) -> tuple[pd.DataFrame, Report]:
+def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT_STRATEGY) -> tuple[
+    pd.DataFrame, Report]:
     """Applique une décision par colonne pour traiter les valeurs manquantes.
 
     Vocabulaire fermé pour `strategy[colonne]` :
@@ -477,10 +480,10 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
     details["rows_dropped_no_nutrient"] = nb_no_key_nutrient
 
     cr = Report(
-        regle="strategie_manquants",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=rows_touched,
+        rule="strategie_manquants",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=rows_touched,
         details=details,
     )
     return res, cr
