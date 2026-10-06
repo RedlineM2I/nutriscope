@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 
-from src.models import CompteRendu
+from src.models import Report
 from src.strategie import DEFAULT_STRATEGY
 
 import pandas as pd
@@ -15,21 +15,22 @@ NUTRIMENT_MAX = 100.0
 SODIUM_MAX = 40.0
 CONSISTENCY_DELTA = 0.5
 
-COLONNES_COMPTEURS = ["nutriscore_score", "nova_group"]
+COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
 KEY_NUTRIENTS = ["energy_100g",
-                 "sugars_100g",
-                 "carbohydrates_100g",
-                 "fat_100g",
-                 "saturated-fat_100g",
-                 "salt_100g",
-                 "proteins_100g",
-                 "fiber_100g",
-                 "sodium_100g",
-                 "fruits-vegetables-legumes_100g"]
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
       
 
-def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
+def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de normalisation des unités :
     - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal 
       sort de l'intervalle [3,9 ; 4,5]
@@ -78,7 +79,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
 
     touched_rows = (kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
 
-    report = CompteRendu(
+    report = Report(
         regle="normalize_units",
         lignes_avant=rows_before,
         lignes_apres=len(res),
@@ -95,7 +96,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
     return res, report
     
 
-def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
+def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
     - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
     - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
@@ -162,7 +163,7 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
     details["sucres"] = int(sugars_inconsistent_mask.sum())
     details["satures"] = int(saturated_inconsistent_mask.sum())
 
-    report = CompteRendu(
+    report = Report(
         regle="limit_nutriments",
         lignes_avant=rows_before,
         lignes_apres=len(res),
@@ -172,7 +173,7 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
 
     return res, report
     
-def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
+def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de correction de l'énergie :
     - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9
     - Pareil pour les kcal supérieurs à 900, si imposssible : NA
@@ -237,7 +238,7 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
         | inconsistent_recomputed_mask
     )
 
-    report = CompteRendu(
+    report = Report(
         regle="fix_energy",
         lignes_avant=rows_before,
         lignes_apres=len(res),
@@ -252,31 +253,32 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, CompteRendu]:
 
     return res, report
 
-def typer_colonnes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+
+def set_column_types(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     """Fixe les types de colonnes attendus par la suite du pipeline :
     code en string, compteurs (nova_group, nutriscore_score) en
     Int64 nullable, nutriments en float64. Ne modifie aucune valeur,
     seulement le dtype.
     """
-    lignes_avant = len(df)
+    rows_before = len(df)
     df = df.copy()
     df["code"] = df["code"].astype("string")
-    for col in COLONNES_COMPTEURS:
+    for col in COUNTER_COLUMNS:
         df[col] = df[col].astype("Int64")
     for col in KEY_NUTRIENTS:
         df[col] = df[col].astype("float64")
 
-    compte_rendu = CompteRendu(
-        regle="typer_colonnes",
-        lignes_avant=lignes_avant,
-        lignes_apres=len(df),
-        lignes_touchees=0,  # aucune valeur changée, que des dtypes
+    report = Report(
+        rule="typer_colonnes",
+        lines_before=rows_before,
+        lines_after=len(df),
+        affected_lines=0,  # aucune valeur changée, que des dtypes
         details={},
     )
-    return df, compte_rendu
+    return df, report
 
 
-def dedupliquer_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+def deduplicate_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     """
     Normalise les codes-barres (espaces), écarte les lignes sans code,
     et ne garde qu'une fiche par code : en cas de doublon, on retient
@@ -289,32 +291,30 @@ def dedupliquer_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
     res["code"] = res["code"].str.strip()
 
     # Ecarte les lignes sans code
-    masque_sans_code = df["code"].isna() | (df["code"].str.strip() == "")
-    nb_sans_code = int(masque_sans_code.sum())
-    res = res.loc[~masque_sans_code]
-    print(f"{nb_sans_code} lignes sans code supprimés")
+    missing_code_mask = df["code"].isna() | (df["code"].str.strip() == "")
+    nb_missing_code = int(missing_code_mask.sum())
+    res = res.loc[~missing_code_mask]
 
     # Supprime les doublons de code
-    res_trie = res.sort_values(["completeness", "last_modified_t"], ascending=[False, False], kind="stable")
-    masque_code_duplique = res_trie.duplicated(subset="code", keep="first")
-    nb_dupliques = int(masque_code_duplique.sum())
-    res = res.loc[~masque_code_duplique]
-    print(f"{nb_dupliques} lignes avec un code en double supprimés")
+    sorted_res = res.sort_values(["completeness", "last_modified_t"], ascending=[False, False], kind="stable")
+    duplicate_code_mask = sorted_res.duplicated(subset="code", keep="first")
+    nb_duplicates = int(duplicate_code_mask.sum())
+    res = res.loc[~duplicate_code_mask]
 
-    cr = CompteRendu(
-        regle="Dédupliquer les codes",
-        lignes_avant=len(df),
-        lignes_apres=len(res),
-        lignes_touchees=nb_sans_code + nb_dupliques,
+    report = Report(
+        rule="Dédupliquer les codes",
+        lines_before=len(df),
+        lines_after=len(res),
+        affected_lines=nb_missing_code + nb_duplicates,
         details={
-            "sans_code": nb_sans_code,
-            "doublons_supprimes": nb_dupliques,
+            "sans_code": nb_missing_code,
+            "doublons_supprimes": nb_duplicates,
         }
     )
-    return res, cr
+    return res, report
 
 
-def traiter_categories_vides(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRendu]:
+def handle_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     """
     Ajout de 'main_category' dérivé du dernier tag de 'categories_tags'
     Ajout d'un drapeau 'category_empty' pour les categories vides
@@ -329,33 +329,33 @@ def traiter_categories_vides(df: pd.DataFrame) -> tuple[pd.DataFrame, CompteRend
     # Ajoute 'main_category' et un drapeau
     res["main_category"] = res["categories_tags"].str[-1]
     res["category_empty"] = res["main_category"].isna()
-    nb_category_empty = int(res["category_empty"].sum())
+    nb_empty_category = int(res["category_empty"].sum())
 
     # Nettoie le food_group
-    food_group_sale = res["food_groups_tags"].str[0]
-    nb_food_group_vide = int(food_group_sale.isna().sum())
-    res["food_group"] = food_group_sale.fillna("unknown")
+    raw_food_group = res["food_groups_tags"].str[0]
+    nb_missing_food_group = int(raw_food_group.isna().sum())
+    res["food_group"] = raw_food_group.fillna("unknown")
 
     drop_mask = res["category_empty"] & (res["food_group"] == "unknown")
-    nb_inclassables = int(drop_mask.sum())
+    nb_unclassifiable = int(drop_mask.sum())
 
-    lignes_touchees = int((res["category_empty"] | (res["food_group"] == "unknown")).sum())
+    rows_touched = int((res["category_empty"] | (res["food_group"] == "unknown")).sum())
 
     res = res[~drop_mask]
 
-    cr = CompteRendu(
-        regle="traiter_categories_vides",
-        lignes_avant=len(df),
-        lignes_apres=len(res),
-        lignes_touchees=lignes_touchees,
+    report = Report(
+        rule="traiter_categories_vides",
+        lines_before=len(df),
+        lines_after=len(res),
+        affected_lines=rows_touched,
         details={
-            "categorie_vide": nb_category_empty,
-            "food_group_derive_de_vide": nb_food_group_vide,
-            "food_group_unknown_total": int((res["food_group"] == "unknown").sum()) + nb_inclassables,
-            "inclassables_supprimes": nb_inclassables,
+            "categorie_vide": nb_empty_category,
+            "food_group_derive_de_vide": nb_missing_food_group,
+            "food_group_unknown_total": int((res["food_group"] == "unknown").sum()) + nb_unclassifiable,
+            "inclassables_supprimes": nb_unclassifiable,
         }
     )
-    return res, cr
+    return res, report
 
 
 def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
@@ -410,7 +410,7 @@ def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]
     return res, nb_missing
 
 
-def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT_STRATEGY) -> tuple[pd.DataFrame, CompteRendu]:
+def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT_STRATEGY) -> tuple[pd.DataFrame, Report]:
     """Applique une décision par colonne pour traiter les valeurs manquantes.
 
     Vocabulaire fermé pour `strategy[colonne]` :
@@ -476,7 +476,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
     details["dropped_columns"] = dropped_columns
     details["rows_dropped_no_nutrient"] = nb_no_key_nutrient
 
-    cr = CompteRendu(
+    cr = Report(
         regle="strategie_manquants",
         lignes_avant=rows_before,
         lignes_apres=len(res),

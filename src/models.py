@@ -12,9 +12,9 @@ class DataModel:
 
 
 @dataclass
-class CompteRendu:
-    regle: str
-    lignes_avant: int
-    lignes_apres: int
-    lignes_touchees: int
+class Report:
+    rule: str
+    lines_before: int
+    lines_after: int
+    affected_lines: int
     details: dict[str, int] = field(default_factory=dict)
