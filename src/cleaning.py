@@ -364,7 +364,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """
     res = df.copy()
     mask = res[column].isna()
-    res[f"{column}_empty"] = mask
+    res[f"{column}_manquant"] = mask
     return res, int(mask.sum())
 
 
@@ -444,22 +444,37 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case "foodgroup_median":
                 mask_before = res[column].isna()
-                res, nb = _apply_median_by_department(res, column)
+                outcome = _apply_median_by_department(res, column)
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case "mode":
                 mask_before = res[column].isna()
-                res, nb = _apply_mode(res, column)
+                outcome = _apply_mode(res, column)
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case "drop_column":
-                nb = 1
-                dropped_columns.append(column)
-                res = res.drop(columns=[column])
+                if column in res.columns:
+                    nb = 1
+                    dropped_columns.append(column)
+                    res = res.drop(columns=[column])
+                else:
+                    nb = 0
 
             case _ if decision.startswith("constant:"):
                 mask_before = res[column].isna()
-                res, nb = _apply_constant(res, column, decision.split(":", 1)[1])
+                outcome = _apply_constant(res, column, decision.split(":", 1)[1])
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case _:
@@ -477,10 +492,10 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
     details["rows_dropped_no_nutrient"] = nb_no_key_nutrient
 
     cr = Report(
-        regle="strategie_manquants",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=rows_touched,
+        rule="strategie_manquants",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=rows_touched,
         details=details,
     )
     return res, cr
