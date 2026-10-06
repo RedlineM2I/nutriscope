@@ -48,14 +48,12 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     # Calcul de kcal depuis kJ si absent
     kcal_derived_mask = kcal.isna() & kj.notna()
-    kcal.loc[kcal_derived_mask] = (kj.loc[kcal_derived_mask] / KJ_PER_KCAL).round(1)
+    kcal.loc[kcal_derived_mask] = (kj.loc[kcal_derived_mask] / KJ_PER_KCAL).round(3)
 
-    # Recalcul de kcal si ratio kJ/kcal hors de l'interval [3.9 ; 4.5].
+    # Recalculate de kcal si ratio kJ/kcal hors de l'interval [3.9 ; 4.5].
     ratio_kj_kcal = kj / kcal
     kcal_recomputed_mask = (
-            kj.notna()
-            & kcal.notna()
-            & (kcal != 0)
+            kj.notna() & kcal.notna() & (kcal >= 1)
             & ((ratio_kj_kcal < RATIO_KCAL_LOW) | (ratio_kj_kcal > RATIO_KCAL_HIGH))
     )
     kcal.loc[kcal_recomputed_mask] = (kj.loc[kcal_recomputed_mask] / KJ_PER_KCAL).round(1)
@@ -69,7 +67,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     # Sodium recalculé depuis le sel si incoherent.
     sodium_recomputed_mask = (
-            sodium.notna() & sel.notna() & ~sodium_derived_mask & ((sel - sodium * SALT_PER_SODIUM).abs() > 1e-6)
+            sodium.notna() & sel.notna() & ~sodium_derived_mask & ((sel - sodium * SALT_PER_SODIUM).abs() > 1e-3)
     )
     sodium.loc[sodium_recomputed_mask] = (sel.loc[sodium_recomputed_mask] / SALT_PER_SODIUM).round(4)
 
@@ -78,7 +76,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     res["sodium_100g"] = sodium
 
     touched_rows = (
-                kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
+            kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
 
     report = Report(
         rule="normalize_units",
@@ -204,7 +202,7 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
         alcohol_mask = pd.Series(False, index=res.index)
     eligible_mask = ~alcohol_mask
 
-    # Si kcal nulles -> recalcul si macronutriments disponibles
+    # Si kcal nulles → recalcul si macronutriments disponibles
     missing_kcal_recomputed_mask = eligible_mask & kcal.isna() & has_macros
     kcal.loc[missing_kcal_recomputed_mask] = calc.loc[missing_kcal_recomputed_mask].round(1)
 
@@ -370,7 +368,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     return res, int(mask.sum())
 
 
-def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> int | tuple[pd.DataFrame, int]:
+def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> tuple[pd.DataFrame, int]:
     """Remplace les manquants de `colonne` par une constante, castée au dtype
     de la colonne pour éviter de polluer une colonne numérique avec une string.
     """
@@ -378,13 +376,13 @@ def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> int | tupl
     mask = res[column].isna()
     nb_missing = int(mask.sum())
     if nb_missing == 0:
-        return 0
+        return res, 0
     value = pd.Series([raw_value]).astype(res[column].dtype).iloc[0]
     res[column] = res[column].fillna(value)
     return res, nb_missing
 
 
-def _apply_median_by_department(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]:
+def _apply_median_by_department(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """Remplace chaque manquant par la médiane de son propre rayon (`res['rayon']`).
     Usage applicatif uniquement (affichage/substitution) : ne remplace pas
     l'imputation ML, qui se fait après le split, dans le pipeline dédié.
@@ -393,12 +391,12 @@ def _apply_median_by_department(df: pd.DataFrame, column: str) -> int | tuple[pd
     mask = res[column].isna()
     nb_missing = int(mask.sum())
     if nb_missing == 0:
-        return 0
+        return res, 0
     res[column] = res.groupby("rayon")[column].transform(lambda s: s.fillna(s.median()))
     return res, nb_missing
 
 
-def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]:
+def _apply_mode(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """Remplace les manquants par la valeur la plus fréquente de la colonne.
     En cas d'égalité entre plusieurs modes, la première (ordre pandas) est retenue.
     """
@@ -406,7 +404,7 @@ def _apply_mode(df: pd.DataFrame, column: str) -> int | tuple[pd.DataFrame, int]
     mask = res[column].isna()
     nb_missing = int(mask.sum())
     if nb_missing == 0:
-        return 0
+        return res, 0
     mode_value = res[column].mode(dropna=True).iloc[0]
     res[column] = res[column].fillna(mode_value)
     return res, nb_missing
