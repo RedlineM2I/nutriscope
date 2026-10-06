@@ -80,10 +80,10 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     touched_rows = (kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
 
     report = Report(
-        regle="normalize_units",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows),
+        rule="normalize_units",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows),
         details={
             "kcal_derivees": int(kcal_derived_mask.sum()),
             "kcal_recalculees": int(kcal_recomputed_mask.sum()),
@@ -164,10 +164,10 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     details["satures"] = int(saturated_inconsistent_mask.sum())
 
     report = Report(
-        regle="limit_nutriments",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="limit_nutriments",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details=details,
     )
 
@@ -239,10 +239,10 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     )
 
     report = Report(
-        regle="fix_energy",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="fix_energy",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details={
             "nulles_recalculees": int(missing_kcal_recomputed_mask.sum()),
             ">900_recalculees": int(over_900_recomputed_mask.sum()),
@@ -477,10 +477,10 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
     details["rows_dropped_no_nutrient"] = nb_no_key_nutrient
 
     cr = Report(
-        regle="strategie_manquants",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=rows_touched,
+        rule="strategie_manquants",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=rows_touched,
         details=details,
     )
     return res, cr
