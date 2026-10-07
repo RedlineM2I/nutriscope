@@ -43,10 +43,12 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     rows_before = len(df)
 
-    kj = res["energy_100g"].copy()
-    kcal = res["energy-kcal_100g"].copy()
-    sel = res["salt_100g"].copy()
-    sodium = res["sodium_100g"].copy()
+    # Travail en float64 pour éviter les erreurs d'affectation lossy
+    # quand les colonnes source sont en float32 (cas parquet).
+    kj = pd.to_numeric(res["energy_100g"], errors="coerce").astype("float64")
+    kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce").astype("float64")
+    sel = pd.to_numeric(res["salt_100g"], errors="coerce").astype("float64")
+    sodium = pd.to_numeric(res["sodium_100g"], errors="coerce").astype("float64")
 
     # Calcul de kcal depuis kJ si absent
     kcal_derived_mask = kcal.isna() & kj.notna()
@@ -438,7 +440,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """
     res = df.copy()
     mask = res[column].isna()
-    res[f"{column}_empty"] = mask
+    res[f"{column}_manquant"] = mask
     return res, int(mask.sum())
 
 
@@ -519,22 +521,37 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case "foodgroup_median":
                 mask_before = res[column].isna()
-                res, nb = _apply_median_by_department(res, column)
+                outcome = _apply_median_by_department(res, column)
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case "mode":
                 mask_before = res[column].isna()
-                res, nb = _apply_mode(res, column)
+                outcome = _apply_mode(res, column)
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case "drop_column":
-                nb = 1
-                dropped_columns.append(column)
-                res = res.drop(columns=[column])
+                if column in res.columns:
+                    nb = 1
+                    dropped_columns.append(column)
+                    res = res.drop(columns=[column])
+                else:
+                    nb = 0
 
             case _ if decision.startswith("constant:"):
                 mask_before = res[column].isna()
-                res, nb = _apply_constant(res, column, decision.split(":", 1)[1])
+                outcome = _apply_constant(res, column, decision.split(":", 1)[1])
+                if outcome == 0:
+                    nb = 0
+                else:
+                    res, nb = outcome
                 global_touched_mask |= mask_before
 
             case _:
