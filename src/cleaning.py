@@ -14,6 +14,8 @@ RATIO_KCAL_HIGH = 4.5
 NUTRIMENT_MAX = 100.0
 SODIUM_MAX = 40.0
 CONSISTENCY_DELTA = 0.5
+MIN_CALC_FOR_CONSISTENCY_CHECK = 50.0  # en dessous, l'écart relatif n'a pas de sens statistique
+MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal déclarée et calcul 4/4/9
 
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
@@ -173,16 +175,111 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     return res, report
 
 
+def _compute_macro_energy(carbs: pd.Series, proteins: pd.Series, fat: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Calcule l'énergie théorique via la formule 4/4/9 (kcal), et un masque
+    indiquant si au moins un macronutriment est renseigné pour la ligne.
+    Les macronutriments manquants comptent pour 0 dans le calcul.
+    """
+    calc = carbs.fillna(0) * 4 + proteins.fillna(0) * 4 + fat.fillna(0) * 9
+    has_macros = carbs.notna() | proteins.notna() | fat.notna()
+    return calc, has_macros
+
+
+def _is_calc_plausible(calc: pd.Series) -> pd.Series:
+    """Un calcul 4/4/9 n'est une base de recalcul valable que s'il reste
+    lui-même sous la borne plausible (KCAL_MAX). Sinon, les macronutriments
+    source sont eux-mêmes aberrants et recalculer ne ferait que remplacer
+    une valeur impossible par une autre.
+    """
+    return calc <= KCAL_MAX
+
+
+def _get_alcohol_exception_mask(res: pd.DataFrame) -> pd.Series:
+    """Les boissons alcoolisées apportent de l'énergie que les macronutriments
+    seuls n'expliquent pas (l'alcool lui-même) : aucune sous-règle de cette
+    fonction ne doit s'appliquer à ce rayon.
+    """
+    if "rayon" not in res.columns:
+        return pd.Series(False, index=res.index)
+    return res["rayon"].astype("string").eq("Alcoholic beverages")
+
+
+def _fix_missing_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series) -> dict[str, pd.Series]:
+    """kcal manquante : recalculée si des macronutriments plausibles sont
+    disponibles, sinon laissée manquante (rien à en tirer).
+    """
+    is_missing = eligible & kcal.isna() & has_macros
+    recomputable = is_missing & _is_calc_plausible(calc)
+    still_invalid = is_missing & ~_is_calc_plausible(calc)
+
+    kcal.loc[recomputable] = calc.loc[recomputable].round(1)
+    kcal.loc[still_invalid] = pd.NA
+
+    return {"recomputable": recomputable, "still_invalid": still_invalid}
+
+
+def _fix_implausibly_high_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series) -> dict[str, pd.Series]:
+    """kcal > KCAL_MAX : recalculée si le calcul 4/4/9 est lui-même plausible,
+    sinon invalidée. Sans ce second cas, une ligne aux macronutriments
+    eux-mêmes aberrants se verrait réassigner une valeur tout aussi
+    impossible à chaque passage, sans jamais converger (idempotence cassée).
+    """
+    is_too_high = eligible & kcal.notna() & (kcal > KCAL_MAX)
+    recomputable = is_too_high & has_macros & _is_calc_plausible(calc)
+    invalidated = is_too_high & (~has_macros | ~_is_calc_plausible(calc))
+
+    kcal.loc[recomputable] = calc.loc[recomputable].round(1)
+    kcal.loc[invalidated] = pd.NA
+
+    return {"recomputable": recomputable, "invalidated": invalidated}
+
+
+def _fix_inconsistent_kcal(
+    kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series, already_handled: pd.Series
+) -> pd.Series:
+    """kcal déclarée trop éloignée du calcul 4/4/9 (>50% d'écart relatif),
+    seulement quand ce calcul est assez significatif (>= 50 kcal) pour que
+    l'écart relatif ait un sens statistique. Les lignes déjà traitées par
+    la règle des kcal trop hautes sont exclues pour ne pas les recalculer deux fois.
+    """
+    calc_is_significant = has_macros & (calc >= MIN_CALC_FOR_CONSISTENCY_CHECK)
+    relative_gap = (kcal - calc).abs() / calc.where(calc != 0)
+
+    is_inconsistent = (
+        eligible
+        & kcal.notna()
+        & calc_is_significant
+        & (relative_gap > MAX_RELATIVE_GAP)
+        & ~already_handled
+    )
+    kcal.loc[is_inconsistent] = calc.loc[is_inconsistent].round(1)
+
+    return is_inconsistent
+
+
+def _realign_kj_with_kcal(kj: pd.Series, kcal: pd.Series) -> pd.Series:
+    """Les kJ doivent toujours être cohérents avec les kcal finales :
+    recalculés là où kcal est connue, remis à NA là où kcal ne l'est plus
+    (ex. invalidée par une des règles ci-dessus).
+    """
+    kj.loc[kcal.notna()] = (kcal.loc[kcal.notna()] * KJ_PER_KCAL).round(1)
+    kj.loc[kcal.isna()] = pd.NA
+    return kj
+
+
 def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    """Règle de correction de l'énergie :
-    - Recalcule les kcal nulles avec les macronutriments en utilisant la formule de recalcul 4/4/9
-    - Pareil pour les kcal supérieurs à 900, si imposssible : NA
-    - Si des valeur kcal sont incohérentes (> 50% d'écart vs calcul 4/4/9 ou si calcul >= 50) : on recalcule
-    - Aucune correction sur le rayon Alcoholic beverages
-    - kJ réalignés sur les kcal finales
+    """Règle de correction de l'énergie, appliquée dans cet ordre :
+
+    1. kcal manquante + macronutriments plausibles -> recalcul via la formule 4/4/9.
+    2. kcal > KCAL_MAX (900) -> recalcul si le calcul 4/4/9 est lui-même plausible,
+       sinon NA (un recalcul vers une valeur tout aussi impossible n'a pas de sens).
+    3. kcal incohérente avec le calcul 4/4/9 (>50% d'écart, calcul >= 50 kcal) -> recalcul.
+    4. kJ réalignés sur les kcal finales (NA si kcal est NA).
+
+    Aucune de ces règles ne s'applique au rayon 'Alcoholic beverages' : l'alcool
+    apporte de l'énergie que les macronutriments seuls n'expliquent pas.
     """
     res = df.copy(deep=True)
-
     rows_before = len(df)
 
     kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce").copy()
@@ -191,51 +288,25 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     proteins = pd.to_numeric(res["proteins_100g"], errors="coerce")
     fat = pd.to_numeric(res["fat_100g"], errors="coerce")
 
-    # Calcul 4/4/9 (possible si au moins un macronutriment est présent)
-    calc = carbs.fillna(0) * 4 + proteins.fillna(0) * 4 + fat.fillna(0) * 9
-    has_macros = carbs.notna() | proteins.notna() | fat.notna()
+    calc, has_macros = _compute_macro_energy(carbs, proteins, fat)
+    eligible = ~_get_alcohol_exception_mask(res)
 
-    # Exception rayon alcool.
-    if "rayon" in res.columns:
-        alcohol_mask = res["rayon"].astype("string").eq("Alcoholic beverages")
-    else:
-        alcohol_mask = pd.Series(False, index=res.index)
-    eligible_mask = ~alcohol_mask
-
-    # Si kcal nulles → recalcul si macronutriments disponibles
-    missing_kcal_recomputed_mask = eligible_mask & kcal.isna() & has_macros
-    kcal.loc[missing_kcal_recomputed_mask] = calc.loc[missing_kcal_recomputed_mask].round(1)
-
-    # Si kcal > 900 -> recalcul si macronurtiments disponibles, sinon NA
-    over_900_mask = eligible_mask & kcal.notna() & (kcal > KCAL_MAX)
-    over_900_recomputed_mask = over_900_mask & has_macros
-    over_900_invalidated_mask = over_900_mask & ~has_macros
-    kcal.loc[over_900_recomputed_mask] = calc.loc[over_900_recomputed_mask].round(1)
-    kcal.loc[over_900_invalidated_mask] = pd.NA
-
-    # Si kcal incoherentes > 50% du calcul 4/4/9 si calcul >= 50.
-    calc_eligible_mask = has_macros & (calc >= 50)
-    relative_gap = (kcal - calc).abs() / calc.where(calc != 0)
-    inconsistent_recomputed_mask = (
-            eligible_mask
-            & kcal.notna()
-            & calc_eligible_mask
-            & (relative_gap > 0.5)
-            & ~over_900_mask
+    missing_masks = _fix_missing_kcal(kcal, calc, has_macros, eligible)
+    high_masks = _fix_implausibly_high_kcal(kcal, calc, has_macros, eligible)
+    inconsistent_mask = _fix_inconsistent_kcal(
+        kcal, calc, has_macros, eligible,
+        already_handled=high_masks["recomputable"] | high_masks["invalidated"],
     )
-    kcal.loc[inconsistent_recomputed_mask] = calc.loc[inconsistent_recomputed_mask].round(1)
 
     res["energy-kcal_100g"] = kcal
-
-    # Réalignement des kJ depuis kcal finales.
-    kj.loc[kcal.notna()] = (kcal.loc[kcal.notna()] * KJ_PER_KCAL).round(1)
-    res["energy_100g"] = kj
+    res["energy_100g"] = _realign_kj_with_kcal(kj, kcal)
 
     touched_rows_mask = (
-            missing_kcal_recomputed_mask
-            | over_900_recomputed_mask
-            | over_900_invalidated_mask
-            | inconsistent_recomputed_mask
+        missing_masks["recomputable"]
+        | missing_masks["still_invalid"]
+        | high_masks["recomputable"]
+        | high_masks["invalidated"]
+        | inconsistent_mask
     )
 
     report = Report(
@@ -244,10 +315,11 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
         lines_after=len(res),
         affected_lines=int(touched_rows_mask.sum()),
         details={
-            "nulles_recalculees": int(missing_kcal_recomputed_mask.sum()),
-            ">900_recalculees": int(over_900_recomputed_mask.sum()),
-            ">900_invalidees": int(over_900_invalidated_mask.sum()),
-            "incoherentes_recalculees": int(inconsistent_recomputed_mask.sum()),
+            "nulles_recalculees": int(missing_masks["recomputable"].sum()),
+            "nulles_invalidees_macros_aberrants": int(missing_masks["still_invalid"].sum()),
+            ">900_recalculees": int(high_masks["recomputable"].sum()),
+            ">900_invalidees": int(high_masks["invalidated"].sum()),
+            "incoherentes_recalculees": int(inconsistent_mask.sum()),
         },
     )
 
