@@ -210,10 +210,10 @@ def _fix_missing_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, e
     """
     is_missing = eligible & kcal.isna() & has_macros
     recomputable = is_missing & _is_calc_plausible(calc)
-    still_invalid = is_missing & ~_is_calc_plausible(calc)
+    # kcal est deja NA ici : pas de changement de valeur, donc pas de ligne "touchee".
+    still_invalid = pd.Series(False, index=kcal.index)
 
     kcal.loc[recomputable] = calc.loc[recomputable].round(1)
-    kcal.loc[still_invalid] = pd.NA
 
     return {"recomputable": recomputable, "still_invalid": still_invalid}
 
@@ -243,12 +243,14 @@ def _fix_inconsistent_kcal(
     la règle des kcal trop hautes sont exclues pour ne pas les recalculer deux fois.
     """
     calc_is_significant = has_macros & (calc >= MIN_CALC_FOR_CONSISTENCY_CHECK)
+    calc_is_plausible = _is_calc_plausible(calc)
     relative_gap = (kcal - calc).abs() / calc.where(calc != 0)
 
     is_inconsistent = (
         eligible
         & kcal.notna()
         & calc_is_significant
+        & calc_is_plausible
         & (relative_gap > MAX_RELATIVE_GAP)
         & ~already_handled
     )
