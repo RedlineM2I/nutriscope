@@ -41,10 +41,12 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     rows_before = len(df)
 
-    kj = res["energy_100g"].copy()
-    kcal = res["energy-kcal_100g"].copy()
-    sel = res["salt_100g"].copy()
-    sodium = res["sodium_100g"].copy()
+    # Travail en float64 pour éviter les erreurs d'affectation lossy
+    # quand les colonnes source sont en float32 (cas parquet).
+    kj = pd.to_numeric(res["energy_100g"], errors="coerce").astype("float64")
+    kcal = pd.to_numeric(res["energy-kcal_100g"], errors="coerce").astype("float64")
+    sel = pd.to_numeric(res["salt_100g"], errors="coerce").astype("float64")
+    sodium = pd.to_numeric(res["sodium_100g"], errors="coerce").astype("float64")
 
     # Calcul de kcal depuis kJ si absent
     kcal_derived_mask = kcal.isna() & kj.notna()
@@ -80,10 +82,10 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     touched_rows = (kcal_derived_mask | kcal_recomputed_mask | salt_derived_mask | sodium_derived_mask | sodium_recomputed_mask).sum()
 
     report = Report(
-        regle="normalize_units",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows),
+        rule="normalize_units",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows),
         details={
             "kcal_derivees": int(kcal_derived_mask.sum()),
             "kcal_recalculees": int(kcal_recomputed_mask.sum()),
@@ -164,10 +166,10 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     details["satures"] = int(saturated_inconsistent_mask.sum())
 
     report = Report(
-        regle="limit_nutriments",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="limit_nutriments",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details=details,
     )
 
@@ -239,10 +241,10 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     )
 
     report = Report(
-        regle="fix_energy",
-        lignes_avant=rows_before,
-        lignes_apres=len(res),
-        lignes_touchees=int(touched_rows_mask.sum()),
+        rule="fix_energy",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
         details={
             "nulles_recalculees": int(missing_kcal_recomputed_mask.sum()),
             ">900_recalculees": int(over_900_recomputed_mask.sum()),
