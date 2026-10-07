@@ -252,7 +252,7 @@ class TestHandleEmptyCategories:
         assert report.rule == "traiter_categories_vides"
         assert report.lines_before == 3
         assert report.lines_after == 2
-        assert report.affected_lines == 2
+        assert report.affected_lines == 1
         assert report.details == {
             "categorie_vide": 2,
             "food_group_derive_de_vide": 1,
@@ -526,7 +526,7 @@ RULE_CASES = [
                  id="deduplicate_codes"),
     # Sans les produits « catégorie vide gardée » : la règle les recompte comme
     # touchés à chaque passage, même sans rien modifier (limite connue du Report).
-    pytest.param(handle_empty_categories, lambda: pick("nominal", "sans_categorie_ni_groupe"), {},
+    pytest.param(handle_empty_categories, lambda: pick("nominal", "sans_categorie_ni_groupe", "categorie_vide_groupe_connu"), {},
                  id="handle_empty_categories"),
     pytest.param(missing_values_strategy, _missing_values_source, {"strategy": MISSING_VALUES_STRATEGY},
                  id="missing_values_strategy"),

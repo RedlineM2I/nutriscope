@@ -170,3 +170,7 @@ Les dictionnaires stockés dans les colonnes sont plutôt difficiles à gérer, 
  'with_sweeteners',
  'schema_version'
 ```
+
+### TP-9
+
+Dans ce tp on a fait le choix de ne pas recontroler le ratio 4/4/9 pour les kcal inférieures à 1 kcal/100g

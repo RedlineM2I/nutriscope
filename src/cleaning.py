@@ -402,6 +402,11 @@ def handle_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     """
     res = df.copy()
 
+    food_group_was_missing = (
+        res["food_group"].isna() if "food_group" in res.columns
+        else res["food_groups_tags"].str[0].isna()
+    )
+
     # Ajoute 'main_category' et un drapeau
     res["main_category"] = res["categories_tags"].str[-1]
     res["category_empty"] = res["main_category"].isna()
@@ -415,7 +420,7 @@ def handle_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     drop_mask = res["category_empty"] & (res["food_group"] == "unknown")
     nb_unclassifiable = int(drop_mask.sum())
 
-    rows_touched = int((res["category_empty"] | (res["food_group"] == "unknown")).sum())
+    rows_touched = int((food_group_was_missing | drop_mask).sum())
 
     res = res[~drop_mask]
 
