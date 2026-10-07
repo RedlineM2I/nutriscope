@@ -27,8 +27,7 @@ KEY_NUTRIENTS = ["energy_100g",
     "fiber_100g",
     "sodium_100g",
     "fruits-vegetables-legumes_100g"
-]
-      
+]   
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de normalisation des unités :
@@ -95,6 +94,10 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     return res, report
     
+
+def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
+    return df, None 
+
 
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
