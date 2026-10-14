@@ -10,45 +10,51 @@ from src.config import KEY_NUTRIENTS
 import pandas as pd
 
 SOURCE = "Export Open Food Facts, périmètre France"
+
 CREDIT = (
     "Données issues d'[Open Food Facts](https://world.openfoodfacts.org) "
     "(ODbL pour la base, CC-BY-SA pour les images)."
 )
+
 MACRO_COLUMNS = ["fat_100g", "carbohydrates_100g", "proteins_100g"]
 
 
 @dataclass
-class SousPartieMarkdown:
-    titre: str
-    texte: dict[str, str]
+class MarkdownSubSection:
+    title: str
+    content: dict[str, str]
 
     def __str__(self) -> str:
-        res = f"## {self.titre}"
-        for nom, resultats in self.texte.items():
-            res = res + f"\n ### {nom} \n {resultats}"
-        return res
+        result = f"## {self.title}"
+        for name, values in self.content.items():
+            result = result + f"\n ### {name} \n {values}"
+        return result
 
-def _dict_to_string(dic: Dict[str, str]) -> str:
-    res = ""
-    for nom, element in dic.items():
-        res = res + f" {nom} : {element}\n\n"
-    return res
 
-def _dict_to_tab_markdown(dic: Dict[str, str]) -> str:
-    res = f"\n\n | {" | ".join([str(nom) for nom in dic.keys()])} |\n"
-    res  = res + "|---" * len(dic) + "|\n"
-    res = res + f"| {" | ".join([str(val) for val in dic.values()])} |\n"
-    return res
+def _dict_to_string(data: Dict[str, str]) -> str:
+    result = ""
+    for name, item in data.items():
+        result = result + f" {name} : {item}\n\n"
+    return result
 
-def _anomalies(before: pd.DataFrame, after: pd.DataFrame) -> SousPartieMarkdown:
+
+def _dict_to_markdown_table(data: Dict[str, str]) -> str:
+    result = f"\n\n | {' | '.join([str(name) for name in data.keys()])} |\n"
+    result = result + "|---" * len(data) + "|\n"
+    result = result + f"| {' | '.join([str(value) for value in data.values()])} |\n"
+    return result
+
+
+def _anomalies(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
     before_values = _anomalies_list(before)
     after_values = _anomalies_list(after)
-    return SousPartieMarkdown(
+
+    return MarkdownSubSection(
         "3. Anomalies métier",
         {
             "Avant nettoyage : ": before_values,
-            "Après nettoyage : ": after_values
-        }
+            "Après nettoyage : ": after_values,
+        },
     )
 
 
@@ -59,65 +65,96 @@ def _anomalies_list(df: pd.DataFrame) -> str:
         "Sel > 100 g ": (df["salt_100g"] > 100).sum(),
         "Protéines > 100 g ": (df["proteins_100g"] > 100).sum(),
         "Énergie > 3 800 kJ ": (df["energy_100g"] > 3800).sum(),
-        "Somme des macronutriments > 100 g ": (df[MACRO_COLUMNS].sum(axis=1) > 100).sum(),
-        "Valeurs négatives ": _dict_to_tab_markdown((df[["energy_100g", *KEY_NUTRIENTS[1:]]] < 0).sum().to_dict()),
+        "Somme des macronutriments > 100 g ": (
+                df[MACRO_COLUMNS].sum(axis=1) > 100
+        ).sum(),
+        "Valeurs négatives ": _dict_to_markdown_table(
+            (df[["energy_100g", *KEY_NUTRIENTS[1:]]] < 0)
+            .sum()
+            .to_dict()
+        ),
     }
+
     return _dict_to_string(anomalies)
 
 
-def _volumetry(avant: pd.DataFrame, apres: pd.DataFrame) -> SousPartieMarkdown:
-    return SousPartieMarkdown(
+def _volumetry(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    return MarkdownSubSection(
         "1. Volumétrie",
         {
-            "Avant nettoyage : ": str(len(avant)),
-            "Après nettoyage : ": str(len(apres))
-        }
+            "Avant nettoyage : ": str(len(before)),
+            "Après nettoyage : ": str(len(after)),
+        },
     )
 
 
-def _rules(journal: List[Report]) -> SousPartieMarkdown:
-    res = SousPartieMarkdown("2. Rapport de nettoyage", {})
-    res.texte["Tableau des rapports : "] = (f"| Règle | Lignes avant | Lignes après | Lignes touchées | Détail |\n"
-                                            f"|---|---|---|---|---|\n")
-    for rapport in journal:
-        res.texte["Tableau des rapports : "] = res.texte["Tableau des rapports : "] + rapport.to_tab_markdown() + "\n"
-    return res
+def _rules(reports: List[Report]) -> MarkdownSubSection:
+    result = MarkdownSubSection("2. Rapport de nettoyage", {})
+
+    result.content["Tableau des rapports : "] = (
+        "| Règle | Lignes avant | Lignes après | Lignes touchées | Détail |\n"
+        "|---|---|---|---|---|\n"
+    )
+
+    for report in reports:
+        result.content["Tableau des rapports : "] = (
+                result.content["Tableau des rapports : "]
+                + report.to_tab_markdown()
+                + "\n"
+        )
+
+    return result
 
 
-def _missing(avant: pd.DataFrame, apres: pd.DataFrame):
-    return SousPartieMarkdown(
+def _missing(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    return MarkdownSubSection(
         "4. Manquants",
         {
-            "Avant nettoyage : ": _dict_to_string(avant[KEY_NUTRIENTS].isna().sum()),
-            "Après nettoyage : ": _dict_to_string(apres[KEY_NUTRIENTS].isna().sum())
-        }
+            "Avant nettoyage : ": _dict_to_string(
+                before[KEY_NUTRIENTS].isna().sum()
+            ),
+            "Après nettoyage : ": _dict_to_string(
+                after[KEY_NUTRIENTS].isna().sum()
+            ),
+        },
     )
 
 
-def _product_by_food_group(apres: pd.DataFrame):
-    res = _dict_to_string(apres.groupby("food_group")["food_group"].count())
-    return SousPartieMarkdown(
+def _products_by_food_group(after: pd.DataFrame) -> MarkdownSubSection:
+    result = _dict_to_string(
+        after.groupby("food_group")["food_group"].count()
+    )
+
+    return MarkdownSubSection(
         "5. Produits par rayon après nettoyage",
         {
-            "Produits par rayon : ": res
-        }
+            "Produits par rayon : ": result,
+        },
     )
 
 
-def _columns(before, after):
-    added = sorted(set(after.columns) - set(before.columns))
-    removed = sorted(set(before.columns) - set(after.columns))
-    return SousPartieMarkdown(
-        " 6. Colonnes ajoutées et retirées",
+def _columns(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    added_columns = sorted(set(after.columns) - set(before.columns))
+    removed_columns = sorted(set(before.columns) - set(after.columns))
+
+    return MarkdownSubSection(
+        "6. Colonnes ajoutées et retirées",
         {
-            "Colonnes ajoutées : ": ", ".join(f"`{col}`" for col in added),
-            "Colonnes supprimées : ": ", ".join(f"`{col}`" for col in removed),
-        }
+            "Colonnes ajoutées : ": ", ".join(
+                f"`{column}`" for column in added_columns
+            ),
+            "Colonnes supprimées : ": ", ".join(
+                f"`{column}`" for column in removed_columns
+            ),
+        },
     )
 
 
-def generer_rapport(
-        avant: pd.DataFrame, apres: pd.DataFrame, journal: list, chemin: Path
+def generate_report(
+        before: pd.DataFrame,
+        after: pd.DataFrame,
+        reports: list,
+        output_path: Path,
 ) -> None:
     """Écrit le rapport de nettoyage au format Markdown.
 
@@ -125,13 +162,15 @@ def generer_rapport(
     produit le même fichier, à la date de génération près.
 
     Args:
-        avant: données avant nettoyage.
-        apres: données après nettoyage.
-        journal: comptes rendus des règles appliquées, dans l'ordre. Chaque
+        before: données avant nettoyage.
+        after: données après nettoyage.
+        reports: comptes rendus des règles appliquées, dans l'ordre. Chaque
             élément expose `name` (str), `rows_touched` (int) et
             `details` (dict sous-règle -> nombre de lignes).
-        chemin: fichier de sortie, par exemple `docs/data/rapport_nettoyage.md`.
+        output_path: fichier de sortie, par exemple
+            `docs/data/rapport_nettoyage.md`.
     """
+
     header = [
         "# Rapport de nettoyage NutriScope",
         "",
@@ -140,14 +179,17 @@ def generer_rapport(
         f"- **Crédit** : {CREDIT}",
         "",
     ]
+
     sections = [
-        _volumetry(avant, apres),
-        _rules(journal),
-        _anomalies(avant, apres),
-        _missing(avant, apres),
-        _product_by_food_group(apres),
-        _columns(avant, apres),
+        _volumetry(before, after),
+        _rules(reports),
+        _anomalies(before, after),
+        _missing(before, after),
+        _products_by_food_group(after),
+        _columns(before, after),
     ]
+
     lines = header + [str(section) + "\n\n" for section in sections]
-    chemin.parent.mkdir(parents=True, exist_ok=True)
-    chemin.write_text("\n".join(lines), encoding="utf-8")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Dict, Tuple
 
-from src.report import generer_rapport
+from src.report import generate_report
 from src.models import Report
 from src.strategie import DEFAULT_STRATEGY
 from src.config import KEY_NUTRIENTS
