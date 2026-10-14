@@ -89,6 +89,10 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     return res, report
 
 
+def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
+    return df, None
+
+
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
     - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
