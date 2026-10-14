@@ -290,7 +290,7 @@ class TestMissingValuesStrategy:
             },
         )
 
-        assert result.loc["nominal", "brands_tags"] == "unknown"           # constant
+        assert result.loc["nominal", "brands_tags"] == ["unknown"]           # constant et liste donc imputation par une liste
         assert pd.isna(result.loc["biscuits", "energy-kcal_100g"])         # flag : pas d'imputation...
         assert result.loc["biscuits", "energy-kcal_100g_manquant"]         # ...mais un drapeau
         assert not result.loc["nominal", "energy-kcal_100g_manquant"]

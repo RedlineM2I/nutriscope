@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Dict, Tuple
 
+import numpy as np
+
 from src.report import generate_report
 from src.models import Report
 from src.strategie import DEFAULT_STRATEGY
@@ -434,17 +436,39 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     return res, int(mask.sum())
 
 
+def _is_list_column(series: pd.Series) -> bool:
+    """True si la colonne contient des listes (VARCHAR[] côté DuckDB).
+
+    DuckDB renvoie les listes en `object` : on inspecte la première valeur non nulle.
+    """
+    if series.dtype != object:
+        return False
+    first = series.dropna().head(1)
+    return len(first) > 0 and isinstance(first.iloc[0], (list, np.ndarray))
+
+
 def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> tuple[pd.DataFrame, int]:
-    """Remplace les manquants de `colonne` par une constante, castée au dtype
-    de la colonne pour éviter de polluer une colonne numérique avec une string.
+    """Remplace les manquants de `column` par une constante.
+
+    - Colonne scalaire : la constante est castée au dtype de la colonne pour
+      éviter de polluer une colonne numérique avec une string.
+    - Colonne liste (VARCHAR[]) : chaque manquant devient `[raw_value]`.
     """
     res = df.copy()
     mask = res[column].isna()
     nb_missing = int(mask.sum())
     if nb_missing == 0:
         return res, 0
-    value = pd.Series([raw_value]).astype(res[column].dtype).iloc[0]
-    res[column] = res[column].fillna(value)
+
+    if _is_list_column(res[column]):
+        # Une nouvelle liste par ligne : on évite de partager le même objet mutable.
+        res.loc[mask, column] = pd.Series(
+            [[raw_value] for _ in range(nb_missing)],
+            index=res.index[mask],
+        )
+    else:
+        value = pd.Series([raw_value]).astype(res[column].dtype).iloc[0]
+        res[column] = res[column].fillna(value)
     return res, nb_missing
 
 
@@ -566,3 +590,23 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
         details=details,
     )
     return res, cr
+
+if __name__ == '__main__':
+    df = pd.read_csv("./drafts/echantillon_france.csv")
+    df["food_groups_tags"] = df[["pnns_groups_1", "pnns_groups_2"]].values.tolist()
+
+    rapports = []
+    new_df, rapport = set_column_types(df)
+    rapports.append(rapport)
+    new_df, rapport = normalize_units(new_df)
+    rapports.append(rapport)
+    new_df, rapport = limit_nutriments(new_df)
+    rapports.append(rapport)
+    new_df, rapport = fix_energy(new_df)
+    rapports.append(rapport)
+    new_df, rapport = deduplicate_codes(new_df)
+    rapports.append(rapport)
+    new_df, rapport = handle_empty_categories(new_df)
+    rapports.append(rapport)
+
+    generate_report(df, new_df, rapports, Path("../docs/data/rapport_nettoyage.md"))
