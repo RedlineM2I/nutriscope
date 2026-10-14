@@ -18,3 +18,10 @@ class Report:
     lines_after: int
     affected_lines: int
     details: dict[str, int] = field(default_factory=dict)
+
+    def to_tab_markdown(self) -> str:
+        res = f"| {self.rule} | {self.lines_before} | {self.lines_after} | {self.affected_lines} |"
+        for nom, detail in self.details.items() :
+            res += f" {nom} : {detail} ;"
+        res += "|"
+        return res

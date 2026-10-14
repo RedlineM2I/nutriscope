@@ -15,7 +15,6 @@ ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
 
 EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
 
-
 class Tag(StrEnum):
     CATEGORIE = "categorie"
     ORIGIN = "origin"
@@ -24,6 +23,18 @@ class Tag(StrEnum):
     BRAND = "brand"
     INGREDIENT = "ingredient"
 
+KEY_NUTRIENTS = [
+    "energy_100g",
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
 
 COLUMNS = [
     # Général

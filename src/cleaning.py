@@ -1,7 +1,10 @@
+from pathlib import Path
 from typing import Dict, Tuple
 
+from src.report import generer_rapport
 from src.models import Report
 from src.strategie import DEFAULT_STRATEGY
+from src.config import KEY_NUTRIENTS
 
 import pandas as pd
 
@@ -18,19 +21,6 @@ MIN_CALC_FOR_CONSISTENCY_CHECK = 50.0  # en dessous, l'écart relatif n'a pas de
 MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal déclarée et calcul 4/4/9
 
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
-
-KEY_NUTRIENTS = ["energy_100g",
-                 "sugars_100g",
-                 "carbohydrates_100g",
-                 "fat_100g",
-                 "saturated-fat_100g",
-                 "salt_100g",
-                 "proteins_100g",
-                 "fiber_100g",
-                 "sodium_100g",
-                 "fruits-vegetables-legumes_100g"
-                 ]
-
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de normalisation des unités :
@@ -111,21 +101,12 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     rows_before = len(df)
     details: Dict[str, int] = {}
 
-    nutrient_columns = [
-        "carbohydrates_100g",
-        "sugars_100g",
-        "fat_100g",
-        "saturated-fat_100g",
-        "salt_100g",
-        "sodium_100g",
-        "proteins_100g",
-        "fiber_100g",
-    ]
-
     # Nombre de lignes touchées (au moins une modification sur la ligne).
     touched_rows_mask = pd.Series(False, index=res.index)
+    nutrients = KEY_NUTRIENTS.copy()
+    nutrients.remove("energy_100g")
 
-    for col in nutrient_columns:
+    for col in nutrients:
         if col not in res.columns:
             continue
 
