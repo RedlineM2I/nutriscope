@@ -544,6 +544,12 @@ class TestFixEnergy:
         assert result["energy-kcal_100g"].iloc[0] == 150.0
         assert report.details["incoherentes_recalculees"] == 0
 
+    def test_negative_energy_is_corrected(self):
+        result, report = fix_energy(one_row({"energy_kcal_100g": -100.0}))
+
+        assert pd.isna(result["energy-kcal_100g"].iloc[0])
+        assert report.details["incoherentes_recalculees"] == 1
+
 
 # ============================================================
 # 3. Pureté et idempotence, pour toutes les règles
