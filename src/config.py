@@ -10,7 +10,7 @@ CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
 PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
- 
+
 
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
@@ -28,11 +28,18 @@ class Tag(StrEnum):
     BRAND = "brand"
     INGREDIENT = "ingredient"
 
-    @property
-    def plural(self) -> str:
-        """Nom des tables et des colonnes de tags : categories, origins..."""
-        return "categories" if self is Tag.CATEGORY else f"{self}s"
-
+KEY_NUTRIENTS = [
+    "energy_100g",
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
 
 COLUMNS = [
     # Général

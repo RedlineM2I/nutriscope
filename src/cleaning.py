@@ -2,8 +2,10 @@ import re
 import unicodedata
 from typing import Dict, Tuple
 
+from src.report import generate_report
 from src.models import Report
 from src.strategy import DEFAULT_STRATEGY
+from src.config import KEY_NUTRIENTS
 
 import pandas as pd
 import numpy as np
@@ -22,18 +24,6 @@ MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal décl
 
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
-KEY_NUTRIENTS = ["energy_100g",
-    "sugars_100g",
-    "carbohydrates_100g",
-    "fat_100g",
-    "saturated-fat_100g",
-    "salt_100g",
-    "proteins_100g",
-    "fiber_100g",
-    "sodium_100g",
-    "fruits-vegetables-legumes_100g"
-]
-
 # Colonnes de tags qui deviennent des tables relationnelles (voir FlatToRelational)
 TAG_COLUMNS = [
     "brands_tags",
@@ -43,6 +33,7 @@ TAG_COLUMNS = [
     "ingredients_tags",
     "additives_tags",
 ]
+
 GRADE_COLUMNS = ["nutriscore_grade", "environmental_score_grade"]
 LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
 
@@ -267,21 +258,12 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     rows_before = len(df)
     details: Dict[str, int] = {}
 
-    nutrient_columns = [
-        "carbohydrates_100g",
-        "sugars_100g",
-        "fat_100g",
-        "saturated-fat_100g",
-        "salt_100g",
-        "sodium_100g",
-        "proteins_100g",
-        "fiber_100g",
-    ]
-
     # Nombre de lignes touchées (au moins une modification sur la ligne).
     touched_rows_mask = pd.Series(False, index=res.index)
+    nutrients = KEY_NUTRIENTS.copy()
+    nutrients.remove("energy_100g")
 
-    for col in nutrient_columns:
+    for col in nutrients:
         if col not in res.columns:
             continue
 
