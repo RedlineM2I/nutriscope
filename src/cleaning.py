@@ -709,7 +709,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
             case _:
                 raise ValueError(f"Décision inconnue '{decision}' pour la colonne '{column}'")
 
-        details[f"{column} → {decision.split(':')[0]}"] = nb
+        details[f"{column} -> {decision.split(':')[0]}"] = nb
 
     # Suppression des lignes sans aucun nutriment clé
     no_key_nutrient_mask = res[KEY_NUTRIENTS].isna().all(axis=1)
