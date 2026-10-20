@@ -8,6 +8,10 @@ BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
 CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
+PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
+ 
+
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 
@@ -17,12 +21,17 @@ EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
 
 
 class Tag(StrEnum):
-    CATEGORIE = "categorie"
+    CATEGORY = "category"
     ORIGIN = "origin"
     LABEL = "label"
     ADDITIVE = "additive"
     BRAND = "brand"
     INGREDIENT = "ingredient"
+
+    @property
+    def plural(self) -> str:
+        """Nom des tables et des colonnes de tags : categories, origins..."""
+        return "categories" if self is Tag.CATEGORY else f"{self}s"
 
 
 COLUMNS = [
@@ -31,6 +40,7 @@ COLUMNS = [
     "product_name",
     "quantity",
     "nutrition_data_per",
+    "last_modified_t",
 
     # Classification
     "brands_tags",

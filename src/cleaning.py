@@ -1,9 +1,12 @@
+import re
+import unicodedata
 from typing import Dict, Tuple
 
 from src.models import Report
-from src.strategie import DEFAULT_STRATEGY
+from src.strategy import DEFAULT_STRATEGY
 
 import pandas as pd
+import numpy as np
 
 KCAL_MAX = 900.0
 SALT_PER_SODIUM = 2.5
@@ -20,16 +23,28 @@ MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal décl
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
 KEY_NUTRIENTS = ["energy_100g",
-                 "sugars_100g",
-                 "carbohydrates_100g",
-                 "fat_100g",
-                 "saturated-fat_100g",
-                 "salt_100g",
-                 "proteins_100g",
-                 "fiber_100g",
-                 "sodium_100g",
-                 "fruits-vegetables-legumes_100g"
-                 ]
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
+
+# Colonnes de tags qui deviennent des tables relationnelles (voir FlatToRelational)
+TAG_COLUMNS = [
+    "brands_tags",
+    "categories_tags",
+    "labels_tags",
+    "origins_tags",
+    "ingredients_tags",
+    "additives_tags",
+]
+GRADE_COLUMNS = ["nutriscore_grade", "environmental_score_grade"]
+LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
 
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
@@ -99,8 +114,145 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     return res, report
 
 
+def _is_list(value) -> bool:
+    return isinstance(value, (list, np.ndarray))
+
+
+def _differs(before, after) -> bool:
+    """Compare deux valeurs de cellule, qu'elles soient scalaires, listes ou manquantes."""
+    if _is_list(before) or _is_list(after):
+        if _is_list(before) and _is_list(after):
+            return list(before) != list(after)
+        return True
+    before_missing, after_missing = pd.isna(before), pd.isna(after)
+    if before_missing or after_missing:
+        return before_missing != after_missing
+    return before != after
+
+
+def _changed_mask(before: pd.Series, after: pd.Series) -> pd.Series:
+    return pd.Series([_differs(b, a) for b, a in zip(before, after)], index=before.index, dtype=bool)
+
+
+def _as_mask(series: pd.Series) -> pd.Series:
+    """Convertit un résultat de comparaison (avec d'éventuels NA) en masque booléen strict."""
+    return series.astype("boolean").fillna(False).astype(bool)
+
+
+def _clean_tags(tags):
+    """Retire le préfixe de langue, passe en minuscules, écarte les tags vides et les doublons.
+    Une liste qui ne contient plus aucun tag devient None."""
+    if not _is_list(tags):
+        return tags
+    cleaned = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            continue
+        name = LANGUAGE_PREFIX.sub("", tag.strip().lower()).strip()
+        if name and name not in cleaned:
+            cleaned.append(name)
+    return cleaned or None
+
+
+def _brand_key(name: str) -> str:
+    """Clé de regroupement : sans accents, sans casse, lettres et chiffres uniquement.
+    'Le-Clerc', 'leclerc' et 'Léclerc' donnent tous 'leclerc'."""
+    without_accents = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    key = re.sub(r"[^a-z0-9]", "", without_accents.lower())
+    return key or name  # marque sans aucun caractère latin : on la garde telle quelle
+
+
+def _merge_brand_spellings(brands: pd.Series) -> pd.Series:
+    """Ramène les variantes d'une même marque à sa graphie la plus fréquente
+    (à égalité, la première dans l'ordre alphabétique)."""
+    all_brands = brands.explode().dropna()
+    if all_brands.empty:
+        return brands
+
+    spellings = all_brands.value_counts().rename_axis("name").reset_index(name="count")
+    spellings["key"] = spellings["name"].map(_brand_key)
+    spellings = spellings.sort_values(["key", "count", "name"], ascending=[True, False, True])
+    canonical_by_key = spellings.drop_duplicates("key").set_index("key")["name"]
+    canonical = dict(zip(spellings["name"], spellings["key"].map(canonical_by_key)))
+
+    def remap(tags):
+        if not _is_list(tags):
+            return tags
+        merged = []
+        for tag in tags:
+            name = canonical.get(tag, tag)
+            if name not in merged:
+                merged.append(name)
+        return merged
+
+    return brands.map(remap)
+
+
 def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    return df, None 
+    """Règle de normalisation des textes :
+    - Noms de produits : espaces superflus retirés, noms vides -> NA,
+      noms tout en majuscules -> seule la première lettre en majuscule
+    - Grades (nutriscore, environmental score) : 'unknown' -> NA
+    - Tags : préfixe de langue retiré ('fr:', 'en:'...), minuscules, tags vides et doublons retirés
+    - Marques : variantes d'écriture (casse, accents, tirets, espaces) ramenées à leur graphie la plus fréquente
+    """
+    res = df.copy()
+
+    rows_before = len(df)
+    details: Dict[str, int] = {}
+    touched_rows_mask = pd.Series(False, index=res.index)
+
+    # Noms de produits
+    if "product_name" in res.columns:
+        names = res["product_name"].str.strip().str.replace(r"\s+", " ", regex=True)
+
+        empty_name_mask = _as_mask(names.eq(""))
+        names = names.mask(empty_name_mask)
+
+        uppercase_name_mask = _as_mask(names.str.isupper())
+        names.loc[uppercase_name_mask] = names.loc[uppercase_name_mask].str.capitalize()
+
+        touched_rows_mask |= _changed_mask(res["product_name"], names)
+        res["product_name"] = names
+        details["noms_vides"] = int(empty_name_mask.sum())
+        details["noms_majuscules"] = int(uppercase_name_mask.sum())
+
+    # Grades inconnus
+    for col in GRADE_COLUMNS:
+        if col not in res.columns:
+            continue
+        unknown_mask = _as_mask(res[col].eq("unknown"))
+        res[col] = res[col].mask(unknown_mask)
+        touched_rows_mask |= unknown_mask
+        details[f"{col}_unknown"] = int(unknown_mask.sum())
+
+    # Tags
+    for col in TAG_COLUMNS:
+        if col not in res.columns:
+            continue
+        tags = res[col].map(_clean_tags)
+        tags_changed_mask = _changed_mask(res[col], tags)
+        res[col] = tags
+        touched_rows_mask |= tags_changed_mask
+        details[f"{col}_normalises"] = int(tags_changed_mask.sum())
+
+    # Marques
+    if "brands_tags" in res.columns:
+        brands = _merge_brand_spellings(res["brands_tags"])
+        brands_merged_mask = _changed_mask(res["brands_tags"], brands)
+        res["brands_tags"] = brands
+        touched_rows_mask |= brands_merged_mask
+        details["marques_fusionnees"] = int(brands_merged_mask.sum())
+
+    report = Report(
+        rule="normalize_texts",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
+        details=details,
+    )
+
+    return res, report
 
 
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
@@ -453,17 +605,39 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     return res, int(mask.sum())
 
 
+def _is_list_column(series: pd.Series) -> bool:
+    """True si la colonne contient des listes (VARCHAR[] côté DuckDB).
+
+    DuckDB renvoie les listes en `object` : on inspecte la première valeur non nulle.
+    """
+    if series.dtype != object:
+        return False
+    first = series.dropna().head(1)
+    return len(first) > 0 and isinstance(first.iloc[0], (list, np.ndarray))
+
+
 def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> tuple[pd.DataFrame, int]:
-    """Remplace les manquants de `colonne` par une constante, castée au dtype
-    de la colonne pour éviter de polluer une colonne numérique avec une string.
+    """Remplace les manquants de `column` par une constante.
+
+    - Colonne scalaire : la constante est castée au dtype de la colonne pour
+      éviter de polluer une colonne numérique avec une string.
+    - Colonne liste (VARCHAR[]) : chaque manquant devient `[raw_value]`.
     """
     res = df.copy()
     mask = res[column].isna()
     nb_missing = int(mask.sum())
     if nb_missing == 0:
         return res, 0
-    value = pd.Series([raw_value]).astype(res[column].dtype).iloc[0]
-    res[column] = res[column].fillna(value)
+
+    if _is_list_column(res[column]):
+        # Une nouvelle liste par ligne : on évite de partager le même objet mutable.
+        res.loc[mask, column] = pd.Series(
+            [[raw_value] for _ in range(nb_missing)],
+            index=res.index[mask],
+        )
+    else:
+        value = pd.Series([raw_value]).astype(res[column].dtype).iloc[0]
+        res[column] = res[column].fillna(value)
     return res, nb_missing
 
 
