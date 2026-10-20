@@ -5,8 +5,6 @@ import duckdb
 from config import KEY_NUTRIENTS
 from src.config import PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON
 
-PARQUET_CLEAN_DATASET = "../drafts/echantillon_france_clean.csv"
-avec_echantillon_csv = "pnns_groups_1"
 SCHEMA_COLUMNS = {
     "code": ("VARCHAR", "un code-barres n'est pas un nombre, on garde les zéros de tête"),
     "product_name": ("VARCHAR", "texte libre, tel que dans le nettoyé"),
@@ -21,29 +19,27 @@ SCHEMA_COLUMNS = {
 
 
 def _create_request() -> str:
-    res = f"""
+    columns = [
+        "CAST(code AS VARCHAR) AS code",
+        "product_name",
+        "food_group",
+        "main_category",
+        "CAST(len(additives_tags) AS SMALLINT) AS additives_n",
+        "CAST(nutriscore_score AS SMALLINT) AS nutriscore_score",
+        "to_timestamp(CAST(last_modified_t AS BIGINT))::TIMESTAMP AS last_modified_t",
+        "nutriscore_grade",
+        "CAST(nova_group AS TINYINT) AS nova_group",
+        *(f'CAST("{n}" AS FLOAT) AS "{n}"' for n in KEY_NUTRIENTS),
+    ]
+    select_clause = ",\n            ".join(columns)
+    return f"""
         COPY (
             SELECT
-            CAST(code AS VARCHAR)                       AS code,
-            product_name,
-            lower(regexp_replace(
-          coalesce(nullif({avec_echantillon_csv}, ''), 'unknown'),
-          '[^a-zA-Z0-9]+', '-', 'g'))               AS food_group,
-            main_category                               AS main_category,
-            CAST(additives_n AS SMALLINT)               AS additives_n,
-            CAST(nutriscore_score AS SMALLINT)          AS nutriscore_score,
-            to_timestamp(CAST(last_modified_t AS BIGINT))::TIMESTAMP AS last_modified_t,
-            nutriscore_grade,
-            CAST(nova_group AS TINYINT)                 AS nova_group,
-    """
-    for nutrient in KEY_NUTRIENTS :
-        res = res + f"CAST(\"{nutrient}\" AS FLOAT) AS \"{nutrient}\","
-    res = res + f"""
-            FROM read_csv('{PARQUET_CLEAN_DATASET}')
+            {select_clause}
+            FROM read_parquet('{PARQUET_CLEAN_DATASET}')
         ) TO '{PARQUET_CLEAN_BY_FOOD_GROUP}' (FORMAT PARQUET, PARTITION_BY (food_group),
             COMPRESSION ZSTD, OVERWRITE_OR_IGNORE)
     """
-    return res
 
 def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
     p = Path(path)
