@@ -1,5 +1,5 @@
 from duckdb import DuckDBPyConnection
-from pandas.core.interchange.dataframe_protocol import DataFrame
+from pandas import DataFrame
 
 
 def get_nutriments(conn_duckdb: DuckDBPyConnection) -> DataFrame:

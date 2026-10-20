@@ -8,21 +8,26 @@ elles doivent être appelées l'une après l'autre dans le même processus.
 """
 
 import os
-from pathlib import Path
+import subprocess
 
+from pathlib import Path
 from duckdb import DuckDBPyConnection, connect
 
 from src import cleaning, fetch_data
-from src.config import EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, Tag
+from src.config import EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, EXPORT_CLEANING_REPORT, Tag
 from src.console import title2
+from src.report import generate_report
 from src.db_parquet.products import extract_products, get_products_from
 from src.db_parquet.relational_reader import RelationalReader
 from src.db_psql.connection import get_engine  # charge aussi le .env
 from src.db_psql.constraints import drop_constraints, restore_constraints
+from src.db_psql.insert import psql_insert_copy
 from src.db_psql.schema import create_tables
-from src.drafts.utilities import psql_insert_copy
 from src.flat_to_relational import FlatToRelational
-from src.models import Report
+from src.config import ELEVATOR
+from src.console import timer, title1
+from src.music import background_music
+
 
 JUNCTION_TABLES = [
     "products_categories", "products_labels", "products_brands", "products_origins",
@@ -44,6 +49,26 @@ CLEANING_RULES = [
 ]
 
 
+@timer
+def main():
+    title1("Projet Nutriscope")
+
+    with background_music(ELEVATOR, play=True):
+        download()
+
+    filter_country(country="en:france")
+
+    clean(Path(EXPORT_CLEANING_REPORT))
+    reset_database()
+
+    # Les tables temporaires DuckDB vivent dans cette connexion : même connexion pour les deux étapes
+    conn_duckdb = connect()
+    flatten_to_relational(conn_duckdb)
+    load_database(conn_duckdb)
+
+    # export_to_parquet()
+
+
 def download() -> None:
     """Télécharge le parquet complet d'OpenFoodFacts."""
     title2("Téléchargement du fichier parquet OpenFactFood")
@@ -52,16 +77,16 @@ def download() -> None:
 
 def filter_country(country: str = "en:france") -> None:
     """Restreint le parquet aux colonnes utiles et aux produits vendus dans le pays."""
-    title2("Filtre sur le perimetre du fichier parquet (colonnes selectionnées et produits en france)")
+    title2("Filtre sur le périmètre du fichier parquet (colonnes sélectionnées et produits en France)")
     get_products_from(country=country)
     print("✔ food.parquet → food_france.parquet")
 
 
-def clean() -> list[Report]:
+def clean(report_path : Path) -> None:
     """Applique les règles de nettoyage et exporte le résultat en parquet."""
     title2("Nettoyage des données")
     products = extract_products(conn=connect())
-
+    before = products.copy()
     reports = []
     for rule in CLEANING_RULES:
         products, report = rule(products)
@@ -71,7 +96,8 @@ def clean() -> list[Report]:
     Path(PARQUET_CLEAN_DATASET).parent.mkdir(parents=True, exist_ok=True)
     products.to_parquet(PARQUET_CLEAN_DATASET)
     print(f"✔ products: DataFrame → {PARQUET_CLEAN_DATASET}")
-    return reports
+    generate_report(before, products, reports, report_path)
+    print(f"✔ Rapport Markdown → {str(report_path)}")
 
 
 def reset_database() -> None:
@@ -100,7 +126,7 @@ def load_database(conn_duckdb: DuckDBPyConnection) -> None:
     rel_reader = RelationalReader(conn_duckdb)
     engine = get_engine()
 
-    # Sans PK/FK sur les tables de liaison, le COPY n'a ni index à maintenir ni FK à vérifier
+    # Sans PK/FK sur les tables de liaison, le COPY n'a ni index à maintenir ni FK à vérifier.
     with engine.begin() as conn_psql:
         constraints = drop_constraints(conn_psql, JUNCTION_TABLES)
 
@@ -157,3 +183,8 @@ def export_to_parquet(schema: str = "public") -> None:
 
     conn.close()
     print(f"Export terminé : {len(tables)} tables")
+
+
+if __name__ == "__main__":
+    subprocess.call('cls', shell=True)
+    main()

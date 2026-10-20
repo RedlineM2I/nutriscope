@@ -9,7 +9,7 @@ import duckdb
 def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
     """
     Extrait les produits du parquet brut, nutriments aplatis
-    :param conn_duckdb: Connexion à la base DuckDB
+    :param conn: Connexion à la base DuckDB
     :return: Dataframe des produits
     """
     query = f"""

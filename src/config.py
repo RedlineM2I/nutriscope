@@ -11,13 +11,13 @@ PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
 PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
 
-
-
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 
 ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
 
 EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
+
+EXPORT_CLEANING_REPORT = BASE_DIR.parent / "docs" / "data" / "rapport_nettoyage.md"
 
 
 class Tag(StrEnum):
@@ -27,6 +27,11 @@ class Tag(StrEnum):
     ADDITIVE = "additive"
     BRAND = "brand"
     INGREDIENT = "ingredient"
+
+    @property
+    def plural(self) -> str:
+        """Nom des tables et des colonnes de tags : categories, origins..."""
+        return "categories" if self is Tag.CATEGORY else f"{self}s"
 
 KEY_NUTRIENTS = [
     "energy_100g",

@@ -15,10 +15,7 @@ def title1(text):
     print(f"{BLUE}{'=' * WIDTH}{RESET}\n")
 
 def title2(text):
-    w = WIDTH * 2 // 3
-    # print(f"\n{YELLOW}{'-' * w}{RESET}")
     print(f"\n{YELLOW}{BOLD} >> {text.upper()}{RESET}\n")
-    # print(f"{YELLOW}{'-' * w}{RESET}")
 
 
 HIDE_CURSOR = "\033[?25l"

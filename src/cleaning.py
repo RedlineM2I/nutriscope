@@ -2,7 +2,6 @@ import re
 import unicodedata
 from typing import Dict, Tuple
 
-from src.report import generate_report
 from src.models import Report
 from src.strategy import DEFAULT_STRATEGY
 from src.config import KEY_NUTRIENTS
@@ -68,7 +67,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     )
     kcal.loc[kcal_recomputed_mask] = (kj.loc[kcal_recomputed_mask] / KJ_PER_KCAL).round(1)
 
-    # Dérivations sel <-> sodium dans les deux sens
+    # Dérivations sel ↔ sodium dans les deux sens
     salt_derived_mask = sel.isna() & sodium.notna()
     sel.loc[salt_derived_mask] = (sodium.loc[salt_derived_mask] * SALT_PER_SODIUM).round(4)
 
@@ -686,20 +685,12 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case "foodgroup_median":
                 mask_before = res[column].isna()
-                outcome = _apply_median_by_department(res, column)
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_median_by_department(res, column)
                 global_touched_mask |= mask_before
 
             case "mode":
                 mask_before = res[column].isna()
-                outcome = _apply_mode(res, column)
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_mode(res, column)
                 global_touched_mask |= mask_before
 
             case "drop_column":
@@ -712,17 +703,13 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case _ if decision.startswith("constant:"):
                 mask_before = res[column].isna()
-                outcome = _apply_constant(res, column, decision.split(":", 1)[1])
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_constant(res, column, decision.split(":", 1)[1])
                 global_touched_mask |= mask_before
 
             case _:
                 raise ValueError(f"Décision inconnue '{decision}' pour la colonne '{column}'")
 
-        details[f"{column}:{decision.split(':')[0]}"] = nb
+        details[f"{column} → {decision.split(':')[0]}"] = nb
 
     # Suppression des lignes sans aucun nutriment clé
     no_key_nutrient_mask = res[KEY_NUTRIENTS].isna().all(axis=1)
