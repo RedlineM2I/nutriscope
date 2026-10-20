@@ -27,6 +27,7 @@ COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 TAG_COLUMNS = [
     "brands_tags",
     "categories_tags",
+    "food_groups_tags",
     "labels_tags",
     "origins_tags",
     "ingredients_tags",
