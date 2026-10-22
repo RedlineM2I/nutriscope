@@ -250,6 +250,7 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
     - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
     - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
+    Pour l'énergie (`energy_100g`), seule la négativité est corrigée (pas de borne haute fixe).
     - Si sucres > glucides + 0,5 -> sucres = NA.
     - Si saturés > lipides + 0,5 -> saturés = NA.
     """
@@ -261,17 +262,19 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     # Nombre de lignes touchées (au moins une modification sur la ligne).
     touched_rows_mask = pd.Series(False, index=res.index)
     nutrients = KEY_NUTRIENTS.copy()
-    nutrients.remove("energy_100g")
 
     for col in nutrients:
         if col not in res.columns:
             continue
 
         series = pd.to_numeric(res[col], errors="coerce").copy()
-        max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
+        if col == "energy_100g":
+            above_bound_mask = pd.Series(False, index=series.index)
+        else:
+            max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
+            above_bound_mask = series > max_bound
 
         negatives_mask = series < 0
-        above_bound_mask = series > max_bound
         invalid_values_mask = negatives_mask | above_bound_mask
 
         series.loc[invalid_values_mask] = pd.NA
