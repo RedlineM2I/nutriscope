@@ -25,7 +25,7 @@ class Tag(StrEnum):
     INGREDIENT = "ingredient"
 
 KEY_NUTRIENTS = [
-    "energy_100g",
+    "energy-kcal_100g",
     "sugars_100g",
     "carbohydrates_100g",
     "fat_100g",

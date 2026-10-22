@@ -1,4 +1,5 @@
 import json, shutil
+import time
 from pathlib import Path
 import duckdb
 
@@ -68,5 +69,8 @@ def convert_parquet():
 
 
 if __name__ == "__main__":
+    start = time.perf_counter()
     n = convert_parquet()
+    end = time.perf_counter()
+    print("Temps d'exécution : ", end - start)
     write_schema(n)
