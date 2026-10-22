@@ -27,6 +27,7 @@ COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 TAG_COLUMNS = [
     "brands_tags",
     "categories_tags",
+    "food_groups_tags",
     "labels_tags",
     "origins_tags",
     "ingredients_tags",
@@ -709,7 +710,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
             case _:
                 raise ValueError(f"Décision inconnue '{decision}' pour la colonne '{column}'")
 
-        details[f"{column} → {decision.split(':')[0]}"] = nb
+        details[f"{column} -> {decision.split(':')[0]}"] = nb
 
     # Suppression des lignes sans aucun nutriment clé
     no_key_nutrient_mask = res[KEY_NUTRIENTS].isna().all(axis=1)
