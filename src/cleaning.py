@@ -1,14 +1,13 @@
-from pathlib import Path
+import re
+import unicodedata
 from typing import Dict, Tuple
 
-import numpy as np
-
-from src.report import generate_report
 from src.models import Report
-from src.strategie import DEFAULT_STRATEGY
+from src.strategy import DEFAULT_STRATEGY
 from src.config import KEY_NUTRIENTS
 
 import pandas as pd
+import numpy as np
 
 KCAL_MAX = 900.0
 SALT_PER_SODIUM = 2.5
@@ -23,6 +22,21 @@ MIN_CALC_FOR_CONSISTENCY_CHECK = 50.0  # en dessous, l'écart relatif n'a pas de
 MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal déclarée et calcul 4/4/9
 
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
+
+# Colonnes de tags qui deviennent des tables relationnelles (voir FlatToRelational)
+TAG_COLUMNS = [
+    "brands_tags",
+    "categories_tags",
+    "food_groups_tags",
+    "labels_tags",
+    "origins_tags",
+    "ingredients_tags",
+    "additives_tags",
+]
+
+GRADE_COLUMNS = ["nutriscore_grade", "environmental_score_grade"]
+LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
+
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de normalisation des unités :
@@ -54,7 +68,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     )
     kcal.loc[kcal_recomputed_mask] = (kj.loc[kcal_recomputed_mask] / KJ_PER_KCAL).round(1)
 
-    # Dérivations sel <-> sodium dans les deux sens
+    # Dérivations sel ↔ sodium dans les deux sens
     salt_derived_mask = sel.isna() & sodium.notna()
     sel.loc[salt_derived_mask] = (sodium.loc[salt_derived_mask] * SALT_PER_SODIUM).round(4)
 
@@ -91,14 +105,152 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     return res, report
 
 
+def _is_list(value) -> bool:
+    return isinstance(value, (list, np.ndarray))
+
+
+def _differs(before, after) -> bool:
+    """Compare deux valeurs de cellule, qu'elles soient scalaires, listes ou manquantes."""
+    if _is_list(before) or _is_list(after):
+        if _is_list(before) and _is_list(after):
+            return list(before) != list(after)
+        return True
+    before_missing, after_missing = pd.isna(before), pd.isna(after)
+    if before_missing or after_missing:
+        return before_missing != after_missing
+    return before != after
+
+
+def _changed_mask(before: pd.Series, after: pd.Series) -> pd.Series:
+    return pd.Series([_differs(b, a) for b, a in zip(before, after)], index=before.index, dtype=bool)
+
+
+def _as_mask(series: pd.Series) -> pd.Series:
+    """Convertit un résultat de comparaison (avec d'éventuels NA) en masque booléen strict."""
+    return series.astype("boolean").fillna(False).astype(bool)
+
+
+def _clean_tags(tags):
+    """Retire le préfixe de langue, passe en minuscules, écarte les tags vides et les doublons.
+    Une liste qui ne contient plus aucun tag devient None."""
+    if not _is_list(tags):
+        return tags
+    cleaned = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            continue
+        name = LANGUAGE_PREFIX.sub("", tag.strip().lower()).strip()
+        if name and name not in cleaned:
+            cleaned.append(name)
+    return cleaned or None
+
+
+def _brand_key(name: str) -> str:
+    """Clé de regroupement : sans accents, sans casse, lettres et chiffres uniquement.
+    'Le-Clerc', 'leclerc' et 'Léclerc' donnent tous 'leclerc'."""
+    without_accents = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    key = re.sub(r"[^a-z0-9]", "", without_accents.lower())
+    return key or name  # marque sans aucun caractère latin : on la garde telle quelle
+
+
+def _merge_brand_spellings(brands: pd.Series) -> pd.Series:
+    """Ramène les variantes d'une même marque à sa graphie la plus fréquente
+    (à égalité, la première dans l'ordre alphabétique)."""
+    all_brands = brands.explode().dropna()
+    if all_brands.empty:
+        return brands
+
+    spellings = all_brands.value_counts().rename_axis("name").reset_index(name="count")
+    spellings["key"] = spellings["name"].map(_brand_key)
+    spellings = spellings.sort_values(["key", "count", "name"], ascending=[True, False, True])
+    canonical_by_key = spellings.drop_duplicates("key").set_index("key")["name"]
+    canonical = dict(zip(spellings["name"], spellings["key"].map(canonical_by_key)))
+
+    def remap(tags):
+        if not _is_list(tags):
+            return tags
+        merged = []
+        for tag in tags:
+            name = canonical.get(tag, tag)
+            if name not in merged:
+                merged.append(name)
+        return merged
+
+    return brands.map(remap)
+
+
 def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    return df, None
+    """Règle de normalisation des textes :
+    - Noms de produits : espaces superflus retirés, noms vides -> NA,
+      noms tout en majuscules -> seule la première lettre en majuscule
+    - Grades (nutriscore, environmental score) : 'unknown' -> NA
+    - Tags : préfixe de langue retiré ('fr:', 'en:'...), minuscules, tags vides et doublons retirés
+    - Marques : variantes d'écriture (casse, accents, tirets, espaces) ramenées à leur graphie la plus fréquente
+    """
+    res = df.copy()
+
+    rows_before = len(df)
+    details: Dict[str, int] = {}
+    touched_rows_mask = pd.Series(False, index=res.index)
+
+    # Noms de produits
+    if "product_name" in res.columns:
+        names = res["product_name"].str.strip().str.replace(r"\s+", " ", regex=True)
+
+        empty_name_mask = _as_mask(names.eq(""))
+        names = names.mask(empty_name_mask)
+
+        uppercase_name_mask = _as_mask(names.str.isupper())
+        names.loc[uppercase_name_mask] = names.loc[uppercase_name_mask].str.capitalize()
+
+        touched_rows_mask |= _changed_mask(res["product_name"], names)
+        res["product_name"] = names
+        details["noms_vides"] = int(empty_name_mask.sum())
+        details["noms_majuscules"] = int(uppercase_name_mask.sum())
+
+    # Grades inconnus
+    for col in GRADE_COLUMNS:
+        if col not in res.columns:
+            continue
+        unknown_mask = _as_mask(res[col].eq("unknown"))
+        res[col] = res[col].mask(unknown_mask)
+        touched_rows_mask |= unknown_mask
+        details[f"{col}_unknown"] = int(unknown_mask.sum())
+
+    # Tags
+    for col in TAG_COLUMNS:
+        if col not in res.columns:
+            continue
+        tags = res[col].map(_clean_tags)
+        tags_changed_mask = _changed_mask(res[col], tags)
+        res[col] = tags
+        touched_rows_mask |= tags_changed_mask
+        details[f"{col}_normalises"] = int(tags_changed_mask.sum())
+
+    # Marques
+    if "brands_tags" in res.columns:
+        brands = _merge_brand_spellings(res["brands_tags"])
+        brands_merged_mask = _changed_mask(res["brands_tags"], brands)
+        res["brands_tags"] = brands
+        touched_rows_mask |= brands_merged_mask
+        details["marques_fusionnees"] = int(brands_merged_mask.sum())
+
+    report = Report(
+        rule="normalize_texts",
+        lines_before=rows_before,
+        lines_after=len(res),
+        affected_lines=int(touched_rows_mask.sum()),
+        details=details,
+    )
+
+    return res, report
 
 
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     """Règle de bornage des nutriments :
     - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
     - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
+    Pour l'énergie (`energy_100g`), seule la négativité est corrigée (pas de borne haute fixe).
     - Si sucres > glucides + 0,5 -> sucres = NA.
     - Si saturés > lipides + 0,5 -> saturés = NA.
     """
@@ -110,17 +262,19 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     # Nombre de lignes touchées (au moins une modification sur la ligne).
     touched_rows_mask = pd.Series(False, index=res.index)
     nutrients = KEY_NUTRIENTS.copy()
-    nutrients.remove("energy_100g")
 
     for col in nutrients:
         if col not in res.columns:
             continue
 
         series = pd.to_numeric(res[col], errors="coerce").copy()
-        max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
+        if col == "energy_100g":
+            above_bound_mask = pd.Series(False, index=series.index)
+        else:
+            max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
+            above_bound_mask = series > max_bound
 
         negatives_mask = series < 0
-        above_bound_mask = series > max_bound
         invalid_values_mask = negatives_mask | above_bound_mask
 
         series.loc[invalid_values_mask] = pd.NA
@@ -535,20 +689,12 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case "foodgroup_median":
                 mask_before = res[column].isna()
-                outcome = _apply_median_by_department(res, column)
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_median_by_department(res, column)
                 global_touched_mask |= mask_before
 
             case "mode":
                 mask_before = res[column].isna()
-                outcome = _apply_mode(res, column)
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_mode(res, column)
                 global_touched_mask |= mask_before
 
             case "drop_column":
@@ -561,17 +707,13 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case _ if decision.startswith("constant:"):
                 mask_before = res[column].isna()
-                outcome = _apply_constant(res, column, decision.split(":", 1)[1])
-                if outcome == 0:
-                    nb = 0
-                else:
-                    res, nb = outcome
+                res, nb = _apply_constant(res, column, decision.split(":", 1)[1])
                 global_touched_mask |= mask_before
 
             case _:
                 raise ValueError(f"Décision inconnue '{decision}' pour la colonne '{column}'")
 
-        details[f"{column}:{decision.split(':')[0]}"] = nb
+        details[f"{column} -> {decision.split(':')[0]}"] = nb
 
     # Suppression des lignes sans aucun nutriment clé
     no_key_nutrient_mask = res[KEY_NUTRIENTS].isna().all(axis=1)
@@ -590,23 +732,3 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
         details=details,
     )
     return res, cr
-
-if __name__ == '__main__':
-    df = pd.read_csv("./drafts/echantillon_france.csv")
-    df["food_groups_tags"] = df[["pnns_groups_1", "pnns_groups_2"]].values.tolist()
-
-    rapports = []
-    new_df, rapport = set_column_types(df)
-    rapports.append(rapport)
-    new_df, rapport = normalize_units(new_df)
-    rapports.append(rapport)
-    new_df, rapport = limit_nutriments(new_df)
-    rapports.append(rapport)
-    new_df, rapport = fix_energy(new_df)
-    rapports.append(rapport)
-    new_df, rapport = deduplicate_codes(new_df)
-    rapports.append(rapport)
-    new_df, rapport = handle_empty_categories(new_df)
-    rapports.append(rapport)
-
-    generate_report(df, new_df, rapports, Path("../docs/data/rapport_nettoyage.md"))

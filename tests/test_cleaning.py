@@ -24,6 +24,7 @@ from src.cleaning import (
     handle_empty_categories,
     limit_nutriments,
     missing_values_strategy,
+    normalize_texts,
     normalize_units,
     set_column_types,
 )
@@ -301,10 +302,10 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 3
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["brands_tags:constant"] == 1
-        assert report.details["energy-kcal_100g:flag"] == 1
-        assert report.details["nova_group:mode"] == 1
-        assert report.details["quantity:drop_column"] == 1
+        assert report.details["brands_tags -> constant"] == 1
+        assert report.details["energy-kcal_100g -> flag"] == 1
+        assert report.details["nova_group -> mode"] == 1
+        assert report.details["quantity -> drop_column"] == 1
         assert report.details["dropped_columns"] == ["quantity"]
         assert report.details["rows_dropped_no_nutrient"] == 0
 
@@ -329,8 +330,62 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 4
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["fat_100g:foodgroup_median"] == 3
+        assert report.details["fat_100g -> foodgroup_median"] == 3
         assert report.details["rows_dropped_no_nutrient"] == 1
+
+
+def _texts_source() -> pd.DataFrame:
+    """Nominal + biscuits (nom en majuscules) + une variante d'écriture de la marque-a."""
+    variante = make_product(
+        code="9999999999999",
+        product_name="   ",               # nom vide une fois les espaces retirés
+        brands_tags=["fr:marque_a"],      # même marque que 'marque-a', graphie minoritaire
+        nutriscore_grade="unknown",
+    )
+    return pd.DataFrame(
+        [PRODUCTS["nominal"], PRODUCTS["biscuits"], variante],
+        index=["nominal", "biscuits", "variante"],
+    )
+
+
+class TestNormalizeTexts:
+
+    def test_nominal_cleans_names_grades_tags_and_merges_brands(self):
+        source = _texts_source()
+
+        result, report = normalize_texts(source)
+
+        assert result.loc["nominal", "product_name"] == "Pates nature"
+        assert result.loc["biscuits", "product_name"] == "Biscuits choco"
+        assert pd.isna(result.loc["variante", "product_name"])
+        assert pd.isna(result.loc["variante", "nutriscore_grade"])
+        assert result.loc["nominal", "categories_tags"] == ["epicerie", "pates"]
+        assert result.loc["nominal", "food_groups_tags"] == ["en:cereals-and-potatoes"]  # hors périmètre
+        assert result.loc["variante", "brands_tags"] == ["marque-a"]  # graphie la plus fréquente
+
+        assert report.rule == "normalize_texts"
+        assert report.lines_before == 3
+        assert report.lines_after == 3
+        assert report.affected_lines == 3
+        assert report.details["noms_vides"] == 1
+        assert report.details["noms_majuscules"] == 1
+        assert report.details["nutriscore_grade_unknown"] == 1
+        assert report.details["brands_tags_normalises"] == 3
+        assert report.details["marques_fusionnees"] == 1
+
+    def test_edge_keeps_unprefixed_and_non_latin_tags_and_drops_empty_ones(self):
+        source = pd.DataFrame([make_product(
+            brands_tags=["fr:marque-a", "fr:Marque_A", "jp:日清", "jp:明治"],
+            labels_tags=["fr:", "  "],
+            origins_tags=["france"],
+        )])
+
+        result, _ = normalize_texts(source)
+
+        # Les deux graphies fusionnent en une seule marque ; les marques non latines restent distinctes
+        assert result["brands_tags"].iloc[0] == ["marque-a", "日清", "明治"]
+        assert result["labels_tags"].iloc[0] is None   # plus aucun tag -> None
+        assert result["origins_tags"].iloc[0] == ["france"]  # pas de préfixe : gardé tel quel
 
 
 class TestNormalizeUnits:
@@ -390,6 +445,13 @@ class TestLimitNutriments:
 
         assert pd.isna(result["sugars_100g"].iloc[0])
         assert report.details["sugars_100g_negatifs"] == 1
+
+    def test_nominal_negative_energy_becomes_na(self):
+        result, report = limit_nutriments(one_row({"energy_100g": -1.0}))
+
+        assert pd.isna(result["energy_100g"].iloc[0])
+        assert report.details["energy_100g_negatifs"] == 1
+        assert report.details["energy_100g_au_dessus"] == 0
 
     def test_nominal_above_100_becomes_na(self):
         result, report = limit_nutriments(one_row({"sugars_100g": 150.0, "carbohydrates_100g": 200.0}))
@@ -489,6 +551,12 @@ class TestFixEnergy:
         assert result["energy-kcal_100g"].iloc[0] == 150.0
         assert report.details["incoherentes_recalculees"] == 0
 
+    def test_negative_energy_is_corrected(self):
+        result, report = fix_energy(one_row({"energy_kcal_100g": -100.0}))
+
+        assert pd.isna(result["energy-kcal_100g"].iloc[0])
+        assert report.details["incoherentes_recalculees"] == 1
+
 
 # ============================================================
 # 3. Pureté et idempotence, pour toutes les règles
@@ -530,6 +598,7 @@ RULE_CASES = [
                  id="handle_empty_categories"),
     pytest.param(missing_values_strategy, _missing_values_source, {"strategy": MISSING_VALUES_STRATEGY},
                  id="missing_values_strategy"),
+    pytest.param(normalize_texts, _texts_source, {}, id="normalize_texts"),
     pytest.param(normalize_units, lambda: pick(*PRODUCTS), {}, id="normalize_units"),
     pytest.param(limit_nutriments, lambda: pick(*PRODUCTS), {}, id="limit_nutriments"),
     pytest.param(fix_energy, lambda: pick(*PRODUCTS), {}, id="fix_energy"),

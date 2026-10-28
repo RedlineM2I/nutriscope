@@ -1,55 +1,38 @@
 """Écriture de DataFrames dans Postgres via COPY."""
-
+import csv
 import io
 import logging
+from typing import Iterator, Any
 
 import pandas as pd
-from sqlalchemy import Connection
+from sqlalchemy.engine.base import Connection
 
-from src.console import timer
-from src.db_psql.connection import get_engine
-
+logging.basicConfig(
+    filename="app.log",
+    encoding="utf-8",
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-
-def insert_one_item(table_name: str, table: pd.DataFrame, columns_int: list[str] = None):
+def psql_insert_copy(table: pd.DataFrame, conn: Connection, keys: list[str], data_iter: Iterator[Any]) -> None:
     """
-    Création d'une connexion puis insertion en base
-    :param table_name: Table dans laquelle insérer le dataframe
-    :param table: Dataframe à insérer dans la base
-    :param columns_int: Noms des colonnes à convertir en Integer
-    :return:
-    """
+    Insertion en base en créant un buffer CSV, utilise COPY au lieu d'INSERT (rapide pour gros volumes).
 
-    @timer(label=table_name)
-    def tmp():
-        with get_engine().begin() as conn:
-            insert_in_db_copy(table, table_name, conn, columns_int=columns_int)
-
-    tmp()
-
-
-@timer
-def insert_in_db_copy(df: pd.DataFrame, table_name: str, conn: Connection, columns_int: list[str] = None):
-    """
-    Insertion en base en créant un buffer CSV
-    :param df: Dataframe à insérer dans la base
-    :param table_name: Table dans laquelle on insère le dataframe
+    :param table: DataFrame à insérer dans la base de données
     :param conn: Connexion à la BDD
-    :param columns_int: Noms des colonnes à convertir en Integer
-    :return:
+    :param keys: Liste des colonnes à inclure dans l'insertion
+    :param data_iter: Iterateur sur les lignes du DataFrame à insérer
     """
-    for col in columns_int or []:
-        df[col] = df[col].astype("Int64")
 
-    buffer = io.StringIO()
-    df.to_csv(buffer, index=False, header=False, na_rep="\\N")
-    buffer.seek(0)
-
-    columns_sql = f"({', '.join(df.columns)})"
-    cur = conn.connection.cursor()
-    cur.copy_expert(
-        f"COPY {table_name} {columns_sql} FROM STDIN WITH (FORMAT csv, NULL '\\N')",
-        buffer
-    )
-    logger.info(f"{len(df)} lignes importées avec succès")
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerows(data_iter)
+        buffer.seek(0)
+        columns = ", ".join(f'"{k}"' for k in keys)
+        table_name = f'"{table.schema}"."{table.name}"' if table.schema else f'"{table.name}"'
+        cur.copy_expert(
+            f"COPY {table_name} ({columns}) FROM STDIN WITH CSV",
+            buffer,
+        )

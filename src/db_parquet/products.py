@@ -1,35 +1,75 @@
 from duckdb import DuckDBPyConnection
 
+from src.config import COLUMNS, PARQUET_FILE, PARQUET_FR
+
 import pandas as pd
+import duckdb
 
 
-def get_products(conn: DuckDBPyConnection) -> pd.DataFrame:
+def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
     """
-    Extrait les produits de la base DuckDB
-    :param conn_duckdb: Connexion à la base DuckDB
+    Extrait les produits du parquet brut, nutriments aplatis
+    :param conn: Connexion à la base DuckDB
     :return: Dataframe des produits
     """
-    query = """
-            SELECT
-                id,
-                code,
-                REPLACE(COALESCE(
+    query = f"""
+        SELECT
+            code,
+            last_modified_t,
+            REPLACE(COALESCE(
                 list_extract(list_filter(product_name, x -> x.lang = 'fr'),   1)."text",
                 list_extract(list_filter(product_name, x -> x.lang = 'main'), 1)."text",
                 list_extract(list_filter(product_name, x -> x.lang = 'en'),   1)."text"), chr(0), '')
-                AS product_name,
-                quantity,
-                nutrition_data_per,
-                case
-                    when nutriscore_grade = 'unknown' or nutriscore_grade = 'not-applicable'
-                    then null
-                    else nutriscore_grade
-                end as nutriscore_grade,
-                nutriscore_score,
-                nova_group,
-                completeness,
-                environmental_score_grade,
-                environmental_score_score
-            FROM produits_dedup
-            """
+            AS product_name,
+            quantity,
+            nutrition_data_per,
+            nutriscore_grade,
+            nutriscore_score,
+            nova_group,
+            completeness,
+            environmental_score_grade,
+            environmental_score_score,
+
+            "brands_tags",
+            "categories_tags",
+            "labels_tags",
+            "origins_tags",
+            "food_groups_tags",
+        
+            "ingredients_tags",
+            "additives_tags",
+            
+            list_extract(list_filter(nutriments, x -> x.name = 'energy-kj'), 1)."100g" AS energy_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'energy-kcal'), 1)."100g" AS 'energy-kcal_100g',
+            list_extract(list_filter(nutriments, x -> x.name = 'sugars'), 1)."100g" AS sugars_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'carbohydrates'), 1)."100g" AS carbohydrates_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'fat'), 1)."100g" AS fat_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'saturated-fat'), 1)."100g" AS 'saturated-fat_100g',
+            list_extract(list_filter(nutriments, x -> x.name = 'salt'), 1)."100g" AS salt_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'sodium'), 1)."100g" AS sodium_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'proteins'), 1)."100g" AS proteins_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'fiber'), 1)."100g" AS fiber_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'fruits-vegetables-nuts'), 1)."100g" AS fruits_nuts_100g,
+            list_extract(list_filter(nutriments, x -> x.name = 'fruits-vegetables-legumes'), 1)."100g" AS 'fruits-vegetables-legumes_100g',
+
+            -- Tout le reste : la liste privée des noms déjà extraits ci-dessus
+            list_filter(
+                nutriments,
+                x -> x.name NOT IN (
+                    'energy-kj', 'energy-kcal', 'sugars', 'carbohydrates', 'fat', 'saturated-fat',
+                    'salt', 'proteins', 'fiber', 'fruits-vegetables-nuts', 'fruits-vegetables-legumes'
+                )
+            ) AS nutriments_secondaires
+        FROM '{PARQUET_FR}'
+    """
     return conn.sql(query).df()
+
+
+def get_products_from(country: str):
+    duckdb.sql(f"""
+        COPY (
+            SELECT {', '.join(COLUMNS)}
+            FROM '{PARQUET_FILE}'
+            WHERE list_contains(countries_tags, '{country}')
+        ) TO '{PARQUET_FR}' (FORMAT PARQUET)
+    """)

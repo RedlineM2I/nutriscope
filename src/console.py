@@ -1,5 +1,6 @@
 """Affichage console : titres, spinner d'activité et chronométrage."""
 
+import contextlib
 import functools
 import itertools
 import sys
@@ -15,50 +16,118 @@ def title1(text):
     print(f"{BLUE}{'=' * WIDTH}{RESET}\n")
 
 def title2(text):
-    w = WIDTH * 2 // 3
-    # print(f"\n{YELLOW}{'-' * w}{RESET}")
     print(f"\n{YELLOW}{BOLD} >> {text.upper()}{RESET}\n")
-    # print(f"{YELLOW}{'-' * w}{RESET}")
 
 
 HIDE_CURSOR = "\033[?25l"
 SHOW_CURSOR = "\033[?25h"
 CLEAR_LINE = "\r\033[K"
+SAVE_CURSOR = "\0337"
+RESTORE_CURSOR = "\0338"
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 _lock = threading.Lock()      # sérialise tous les accès à stdout
 _stack = []                   # labels actifs, du plus externe au plus interne
 _spinner_active = False
+_paused = False               # vrai : le spinner n'écrit plus (voir pause_spinner)
+
+
+class _SpinnerSafeStdout:
+    """
+    Remplace sys.stdout tant que le spinner tourne : chaque ligne complète
+    efface d'abord la ligne du spinner, pour que print() s'affiche proprement.
+    """
+
+    def __init__(self, stream):
+        self.stream = stream
+        self._buffer = ""
+
+    def write(self, text):
+        with _lock:
+            self._buffer += text
+            if "\n" in self._buffer:
+                lines, self._buffer = self._buffer.rsplit("\n", 1)
+                self.stream.write(CLEAR_LINE + lines + "\n")
+                self.stream.flush()
+        return len(text)
+
+    def flush(self):
+        pass    # une ligne incomplète attend son "\n", sinon le spinner l'écraserait
+
+    def close_buffer(self):
+        """Écrit la ligne incomplète restante (appelé une fois le spinner arrêté).
+        Le retour à la ligne évite qu'elle soit effacée par la ligne du timer."""
+        with _lock:
+            if self._buffer:
+                self.stream.write(self._buffer + "\n")
+                self._buffer = ""
+            self.stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+
+def _terminal():
+    """Le vrai stdout, même quand il est remplacé par _SpinnerSafeStdout."""
+    out = sys.stdout
+    return out.stream if isinstance(out, _SpinnerSafeStdout) else out
 
 
 def _emit(text):
     """Écrit une ligne sans se faire écraser par le spinner en cours."""
     with _lock:
-        sys.stdout.write(CLEAR_LINE + text + "\n")
-        sys.stdout.flush()
+        _terminal().write(CLEAR_LINE + text + "\n")
+        _terminal().flush()
 
 
-log = _emit   # à utiliser à la place de print() dans le code chronométré
+log = _emit   # équivalent de print(), conservé pour le code existant
 
 
-def _spin(stop):
+@contextlib.contextmanager
+def pause_spinner():
+    """
+    Place le spinner sur la ligne en dessous d'un affichage qui gère lui-même sa ligne
+    (barre tqdm) : sinon les deux se réécrivent la même ligne en alternance (flickering).
+    Sans effet si aucun spinner ne tourne.
+    """
+    global _paused
+    with _lock:
+        _paused = _spinner_active
+        if _paused:
+            # Réserve la ligne du dessous pour le spinner, puis remonte : la barre s'affiche ici
+            _terminal().write(f"{CLEAR_LINE}\n\033[1A")
+            _terminal().flush()
+    try:
+        yield
+    finally:
+        with _lock:
+            # La barre fermée (tqdm) laisse le curseur sur la ligne du spinner : il y reprend
+            _paused = False
+
+
+def _spin(stop, out):
     frames = itertools.cycle(FRAMES)
     t0 = time.perf_counter()
     with _lock:
-        sys.stdout.write(HIDE_CURSOR)
-        sys.stdout.flush()
+        out.write(HIDE_CURSOR)
+        out.flush()
     try:
         while not stop.is_set():
             with _lock:
                 label = _stack[-1] if _stack else ""
                 elapsed = time.perf_counter() - t0
-                sys.stdout.write(f"\r{next(frames)} {label}… {elapsed:4.0f}s\033[K")
-                sys.stdout.flush()
+                text = f"{next(frames)} {label}… {elapsed:4.0f}s\033[K"
+                if _paused:
+                    # Dessine sur la ligne sous le curseur, sans le déplacer
+                    out.write(f"{SAVE_CURSOR}\033[1B\r{text}{RESTORE_CURSOR}")
+                else:
+                    out.write(f"\r{text}")
+                out.flush()
             stop.wait(0.1)    # réveil immédiat quand stop est levé
     finally:
         with _lock:
-            sys.stdout.write(CLEAR_LINE + SHOW_CURSOR)
-            sys.stdout.flush()
+            out.write(CLEAR_LINE + SHOW_CURSOR)
+            out.flush()
 
 
 def timer(func=None, *, label=None, store=None, spinner=True):
@@ -95,10 +164,12 @@ def timer(func=None, *, label=None, store=None, spinner=True):
                 if owns:
                     _spinner_active = True
 
-            stop = thread = None
+            stop = thread = safe_stdout = None
             if owns:
+                safe_stdout = _SpinnerSafeStdout(sys.stdout)
+                sys.stdout = safe_stdout
                 stop = threading.Event()
-                thread = threading.Thread(target=_spin, args=(stop,), daemon=True)
+                thread = threading.Thread(target=_spin, args=(stop, safe_stdout.stream), daemon=True)
                 thread.start()
 
             start = time.perf_counter()
@@ -111,6 +182,8 @@ def timer(func=None, *, label=None, store=None, spinner=True):
                 if owns:
                     stop.set()
                     thread.join()
+                    safe_stdout.close_buffer()
+                    sys.stdout = safe_stdout.stream
                     with _lock:
                         _spinner_active = False
                         sys.stdout.write(SHOW_CURSOR)   # filet de sécurité
