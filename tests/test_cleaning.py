@@ -446,6 +446,13 @@ class TestLimitNutriments:
         assert pd.isna(result["sugars_100g"].iloc[0])
         assert report.details["sugars_100g_negatifs"] == 1
 
+    def test_nominal_negative_energy_becomes_na(self):
+        result, report = limit_nutriments(one_row({"energy_100g": -1.0}))
+
+        assert pd.isna(result["energy_100g"].iloc[0])
+        assert report.details["energy_100g_negatifs"] == 1
+        assert report.details["energy_100g_au_dessus"] == 0
+
     def test_nominal_above_100_becomes_na(self):
         result, report = limit_nutriments(one_row({"sugars_100g": 150.0, "carbohydrates_100g": 200.0}))
 
