@@ -291,7 +291,7 @@ class TestMissingValuesStrategy:
             },
         )
 
-        assert result.loc["nominal", "brands_tags"] == "unknown"           # constant
+        assert result.loc["nominal", "brands_tags"] == ["unknown"]           # constant et liste donc imputation par une liste
         assert pd.isna(result.loc["biscuits", "energy-kcal_100g"])         # flag : pas d'imputation...
         assert result.loc["biscuits", "energy-kcal_100g_manquant"]         # ...mais un drapeau
         assert not result.loc["nominal", "energy-kcal_100g_manquant"]
@@ -302,10 +302,10 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 3
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["brands_tags:constant"] == 1
-        assert report.details["energy-kcal_100g:flag"] == 1
-        assert report.details["nova_group:mode"] == 1
-        assert report.details["quantity:drop_column"] == 1
+        assert report.details["brands_tags -> constant"] == 1
+        assert report.details["energy-kcal_100g -> flag"] == 1
+        assert report.details["nova_group -> mode"] == 1
+        assert report.details["quantity -> drop_column"] == 1
         assert report.details["dropped_columns"] == ["quantity"]
         assert report.details["rows_dropped_no_nutrient"] == 0
 
@@ -330,7 +330,7 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 4
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["fat_100g:foodgroup_median"] == 3
+        assert report.details["fat_100g -> foodgroup_median"] == 3
         assert report.details["rows_dropped_no_nutrient"] == 1
 
 
@@ -446,6 +446,13 @@ class TestLimitNutriments:
         assert pd.isna(result["sugars_100g"].iloc[0])
         assert report.details["sugars_100g_negatifs"] == 1
 
+    def test_nominal_negative_energy_becomes_na(self):
+        result, report = limit_nutriments(one_row({"energy_100g": -1.0}))
+
+        assert pd.isna(result["energy_100g"].iloc[0])
+        assert report.details["energy_100g_negatifs"] == 1
+        assert report.details["energy_100g_au_dessus"] == 0
+
     def test_nominal_above_100_becomes_na(self):
         result, report = limit_nutriments(one_row({"sugars_100g": 150.0, "carbohydrates_100g": 200.0}))
 
@@ -543,6 +550,12 @@ class TestFixEnergy:
 
         assert result["energy-kcal_100g"].iloc[0] == 150.0
         assert report.details["incoherentes_recalculees"] == 0
+
+    def test_negative_energy_is_corrected(self):
+        result, report = fix_energy(one_row({"energy_kcal_100g": -100.0}))
+
+        assert pd.isna(result["energy-kcal_100g"].iloc[0])
+        assert report.details["incoherentes_recalculees"] == 1
 
 
 # ============================================================
