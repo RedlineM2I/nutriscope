@@ -42,8 +42,8 @@ Un benchmark est honnête quand chacun peut le rejouer et que ses limites sont �
 
 | Méthode             | Temps  |
 |---------------------|--------|
-| Parquet complet     | s      |
-| Base PostgreSQL     | s      |
+| Parquet complet     | 35.86s |
+| Base PostgreSQL     | 102.5s |
 | Parquet partitionné | 1.308s |
 
 ## Tableau comparatif
