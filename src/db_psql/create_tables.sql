@@ -140,7 +140,7 @@ CREATE TABLE products_additives
 CREATE TABLE nutritional_values
 (
     product_id          INTEGER REFERENCES products (id),
-    energy_100g         FLOAT, -- in kJ
+    energy_kcal_100g    FLOAT,
     fat_100g            FLOAT,
     saturated_fat_100g  FLOAT,
     carbohydrates_100g  FLOAT,
@@ -148,7 +148,8 @@ CREATE TABLE nutritional_values
     fiber_100g          FLOAT,
     proteins_100g       FLOAT,
     salt_100g           FLOAT,
-    fruits_nuts_100g    FLOAT,
+    sodium_100g         FLOAT,
+    fruits_nuts_100g   FLOAT,
     fruits_legumes_100g FLOAT
 );
 

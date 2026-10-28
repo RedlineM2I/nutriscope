@@ -28,11 +28,37 @@ class Tag(StrEnum):
     ADDITIVE = "additive"
     BRAND = "brand"
     INGREDIENT = "ingredient"
+    # FOODGROUP = "foodgroup"
 
     @property
     def plural(self) -> str:
         """Nom des tables et des colonnes de tags : categories, origins..."""
-        return "categories" if self is Tag.CATEGORY else f"{self}s"
+
+        if self is Tag.CATEGORY:
+            return "categories"
+
+        # elif self is Tag.FOODGROUP:
+        #     return "food"
+        
+        return f"{self}s"
+
+    # def get_origin_tag(self):
+    #     return "food_groups_tags" if self is Tag.FOODGROUP else f"{self}s"
+
+
+# TAG_COLUMNS = [
+#     "brands_tags",
+#     "categories_tags",
+#     "food_groups_tags"
+#     "labels_tags",
+#     "origins_tags",
+#     "ingredients_tags",
+#     "additives_tags",
+# ]
+
+TAG_COLUMNS = [f"{tag.plural}_tags" for tag in Tag] + [
+    "food_groups_tags"
+]
 
 KEY_NUTRIENTS = [
     "energy_100g",
@@ -47,24 +73,13 @@ KEY_NUTRIENTS = [
     "fruits-vegetables-legumes_100g"
 ]
 
-COLUMNS = [
+COLUMNS = TAG_COLUMNS + [
     # Général
     "code",
     "product_name",
     "quantity",
     "nutrition_data_per",
     "last_modified_t",
-
-    # Classification
-    "brands_tags",
-    "categories_tags",
-    "labels_tags",
-    "origins_tags",
-    "food_groups_tags",
-
-    # Ingrédients
-    "ingredients_tags",
-    "additives_tags",
 
     "nutriments",
     "nutriscore_grade",
