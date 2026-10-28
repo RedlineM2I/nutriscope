@@ -9,8 +9,8 @@ PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 
 PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
-PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
-SCHEMA_PRODUIT_JSON = f"{BASE_DIR.parent}/data/parquet/schema_produits.json"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/products"
+SCHEMA_PRODUIT_JSON = f"{BASE_DIR.parent}/data/parquet/schema_products.json"
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
