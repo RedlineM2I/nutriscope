@@ -1,5 +1,5 @@
 import urllib.request
-from pathlib import Path
+
 from tqdm import tqdm
 
 from src.config import BASE_DIR

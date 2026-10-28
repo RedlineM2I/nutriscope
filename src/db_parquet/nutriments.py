@@ -1,5 +1,5 @@
 from duckdb import DuckDBPyConnection
-from pandas.core.interchange.dataframe_protocol import DataFrame
+from pandas import DataFrame
 
 
 def get_nutriments(conn_duckdb: DuckDBPyConnection) -> DataFrame:
@@ -30,13 +30,13 @@ def get_secondary_nutrients(conn_duckdb: DuckDBPyConnection) -> DataFrame :
     :return: Dataframe des nutriments secondaires
     """
     return conn_duckdb.sql("""
-                           SELECT id               as product_id,
-                                  nutriment.name   AS name,
-                                  nutriment."100g" AS value_100g,
-                                  nutriment.unit   AS unit
-                           FROM (SELECT id, UNNEST(nutriments_secondaires) AS nutriment
-                                 FROM nutriments_extraits)
-                           """).df()
+        SELECT id               as product_id,
+                nutriment.name   AS name,
+                nutriment."100g" AS value_100g,
+                nutriment.unit   AS unit
+        FROM (SELECT id, UNNEST(nutriments_secondaires) AS nutriment
+                FROM nutriments_extraits)
+    """).df()
 
 
 def get_secondary_nutrients_link_table(conn_duckdb: DuckDBPyConnection) -> tuple[DataFrame, DataFrame]:

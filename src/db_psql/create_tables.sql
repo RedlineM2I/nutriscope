@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS products_ingredients CASCADE;
 DROP TABLE IF EXISTS secondary_nutrients CASCADE;
 DROP TABLE IF EXISTS products CASCADE ;
 DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS foodgroups CASCADE;
 DROP TABLE IF EXISTS origins CASCADE;
 DROP TABLE IF EXISTS additives CASCADE;
 DROP TABLE IF EXISTS images CASCADE;
@@ -27,15 +28,20 @@ CREATE TABLE categories
     name VARCHAR UNIQUE NOT NULL
 );
 
+CREATE TABLE foodgroups
+(
+    id  SERIAL PRIMARY KEY,
+    name VARCHAR UNIQUE NOT NULL
+);
+
 -- Main table: one product per barcode
 CREATE TABLE products
 (
     id                        SERIAL PRIMARY KEY,
     code                      VARCHAR UNIQUE NOT NULL,
     product_name              VARCHAR,
-    quantity                  VARCHAR,
     main_category             INTEGER REFERENCES categories (id),
-    foodgroup_id             INTEGER REFERENCES foodgroups (id),
+    foodgroup_id              INTEGER REFERENCES foodgroups (id),
     nutrition_data_per        VARCHAR,
     nutriscore_grade          VARCHAR, -- CHAR(1) CHECK (nutriscore_grade IN ('a','b','c','d','e'))
     nutriscore_score          SMALLINT,
@@ -43,13 +49,7 @@ CREATE TABLE products
     completeness              REAL,
     environmental_score_grade VARCHAR, -- CHAR(1) CHECK (environmental_score_grade IN ('a','b','c','d','e'))
     environmental_score_score SMALLINT,
-    last_modified_t           DATETIME
-);
-
-CREATE TABLE foodgroups
-(
-    id  SERIAL PRIMARY KEY,
-    name VARCHAR UNIQUE NOT NULL
+    last_modified_t           TIMESTAMP
 );
 
 -- ============================================================
