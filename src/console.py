@@ -1,5 +1,6 @@
 """Affichage console : titres, spinner d'activité et chronométrage."""
 
+import contextlib
 import functools
 import itertools
 import sys
@@ -21,11 +22,14 @@ def title2(text):
 HIDE_CURSOR = "\033[?25l"
 SHOW_CURSOR = "\033[?25h"
 CLEAR_LINE = "\r\033[K"
+SAVE_CURSOR = "\0337"
+RESTORE_CURSOR = "\0338"
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 _lock = threading.Lock()      # sérialise tous les accès à stdout
 _stack = []                   # labels actifs, du plus externe au plus interne
 _spinner_active = False
+_paused = False               # vrai : le spinner n'écrit plus (voir pause_spinner)
 
 
 class _SpinnerSafeStdout:
@@ -79,6 +83,28 @@ def _emit(text):
 log = _emit   # équivalent de print(), conservé pour le code existant
 
 
+@contextlib.contextmanager
+def pause_spinner():
+    """
+    Place le spinner sur la ligne en dessous d'un affichage qui gère lui-même sa ligne
+    (barre tqdm) : sinon les deux se réécrivent la même ligne en alternance (flickering).
+    Sans effet si aucun spinner ne tourne.
+    """
+    global _paused
+    with _lock:
+        _paused = _spinner_active
+        if _paused:
+            # Réserve la ligne du dessous pour le spinner, puis remonte : la barre s'affiche ici
+            _terminal().write(f"{CLEAR_LINE}\n\033[1A")
+            _terminal().flush()
+    try:
+        yield
+    finally:
+        with _lock:
+            # La barre fermée (tqdm) laisse le curseur sur la ligne du spinner : il y reprend
+            _paused = False
+
+
 def _spin(stop, out):
     frames = itertools.cycle(FRAMES)
     t0 = time.perf_counter()
@@ -90,7 +116,12 @@ def _spin(stop, out):
             with _lock:
                 label = _stack[-1] if _stack else ""
                 elapsed = time.perf_counter() - t0
-                out.write(f"\r{next(frames)} {label}… {elapsed:4.0f}s\033[K")
+                text = f"{next(frames)} {label}… {elapsed:4.0f}s\033[K"
+                if _paused:
+                    # Dessine sur la ligne sous le curseur, sans le déplacer
+                    out.write(f"{SAVE_CURSOR}\033[1B\r{text}{RESTORE_CURSOR}")
+                else:
+                    out.write(f"\r{text}")
                 out.flush()
             stop.wait(0.1)    # réveil immédiat quand stop est levé
     finally:
@@ -157,7 +188,7 @@ def timer(func=None, *, label=None, store=None, spinner=True):
                         _spinner_active = False
                         sys.stdout.write(SHOW_CURSOR)   # filet de sécurité
                         sys.stdout.flush()
-                _emit(f"[{name}] {duration:.3f} s")
+                _emit(f"\n[{name}] {duration:.3f} s")   # ligne vide avant pour aérer
                 if store is not None:
                     store[name] = duration
 

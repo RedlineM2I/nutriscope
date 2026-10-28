@@ -25,3 +25,11 @@ class Report:
             res += f" {nom} : {detail} ;"
         res += "|"
         return res
+
+
+@dataclass
+class StepReport:
+    step: str
+    duration: float
+    rows: int
+    files: list[str] = field(default_factory=list)

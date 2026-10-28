@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 
 from src.models import Report
 from src.strategy import DEFAULT_STRATEGY
-from src.config import KEY_NUTRIENTS
+from src.config import KEY_NUTRIENTS, TAG_COLUMNS
 
 import pandas as pd
 import numpy as np
@@ -24,14 +24,6 @@ MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal décl
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
 # Colonnes de tags qui deviennent des tables relationnelles (voir FlatToRelational)
-TAG_COLUMNS = [
-    "brands_tags",
-    "categories_tags",
-    "labels_tags",
-    "origins_tags",
-    "ingredients_tags",
-    "additives_tags",
-]
 
 GRADE_COLUMNS = ["nutriscore_grade", "environmental_score_grade"]
 LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
