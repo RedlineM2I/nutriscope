@@ -188,7 +188,7 @@ def timer(func=None, *, label=None, store=None, spinner=True):
                         _spinner_active = False
                         sys.stdout.write(SHOW_CURSOR)   # filet de sécurité
                         sys.stdout.flush()
-                _emit(f"[{name}] {duration:.3f} s")
+                _emit(f"\n[{name}] {duration:.3f} s")   # ligne vide avant pour aérer
                 if store is not None:
                     store[name] = duration
 

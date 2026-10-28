@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 
 from src.models import Report
 from src.strategy import DEFAULT_STRATEGY
-from src.config import KEY_NUTRIENTS
+from src.config import KEY_NUTRIENTS, TAG_COLUMNS
 
 import pandas as pd
 import numpy as np
