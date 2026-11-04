@@ -1,13 +1,12 @@
 import hashlib
 import json
 import subprocess
-from datetime import date
 
 import duckdb
 import pandas as pd
 from _duckdb import DuckDBPyConnection
 from pathlib import Path
-from src.config import PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR
+from src.config import PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR, TODAY
 
 KEY_NUTRIENTS = [
     "energy-kcal_100g",
@@ -87,8 +86,7 @@ def build_select(path: str = PARQUET_CLEAN_BY_FOOD_GROUP) -> str:
     """
 
 def write_parquet(force : bool = False) -> Path:
-    today = date.today()
-    path = Path(f"{BASE_DIR.parent}/data/exports/features_nutriscope_{today.strftime("%Y%m%d")}.parquet")
+    path = Path(f"{BASE_DIR.parent}/data/exports/features_nutriscope_{TODAY}.parquet")
     if path.exists() and not force:
         raise FileExistsError()
     path.parent.mkdir(parents=True, exist_ok=True)
