@@ -73,6 +73,7 @@ def step_download() -> StepReport:
 
 def step_clean() -> StepReport:
     """Nettoie le périmètre France ; lignes = produits conservés après la dernière règle."""
+    title2("Nettoyage des données")
     start = time.perf_counter()
     conn_duckdb = connect()
     products = extract_products(conn_duckdb)
@@ -132,7 +133,7 @@ def filter_country(country: str = "en:france") -> None:
 @timer(label="Nettoyage")
 def clean(products) -> int:
     """Applique les règles de nettoyage et exporte le résultat en parquet. Retourne le nombre de lignes finales."""
-    title2("Nettoyage des données")
+    # title2("Nettoyage des données")
     before = products.copy()
     reports = []
     for rule in CLEANING_RULES:
