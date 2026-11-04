@@ -1,6 +1,6 @@
 # Rapport de nettoyage NutriScope
 
-- **Date** : 2026-10-28
+- **Date** : 2026-11-04
 - **Source** : Export Open Food Facts, périmètre France
 - **Crédit** : Données issues d'[Open Food Facts](https://world.openfoodfacts.org) (ODbL pour la base, CC-BY-SA pour les images).
 
@@ -73,7 +73,7 @@
 
 ## 4. Manquants
  ### Avant nettoyage :  
-  energy_100g : 387031
+  energy-kcal_100g : 379172
 
  sugars_100g : 386554
 
@@ -95,7 +95,7 @@
 
 
  ### Après nettoyage :  
-  energy_100g : 20813
+  energy-kcal_100g : 20813
 
  sugars_100g : 25924
 
