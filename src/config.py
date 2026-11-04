@@ -1,51 +1,51 @@
-from pathlib import Path
+"""Chemins du projet et constantes métier."""
 
-import time
-import functools
+from enum import StrEnum
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 
 PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
-CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
+PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
 
-SCRIPT_CREATION = f"{BASE_DIR.parent}/src/data/db/create_tables.sql"
+PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/produits"
+SCHEMA_PRODUIT_JSON = f"{BASE_DIR.parent}/data/parquet/schema_produits.json"
+
+SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
+ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
+EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
+
+EXPORT_CLEANING_REPORT = BASE_DIR.parent / "docs" / "data" / "rapport_nettoyage.md"
 
 
-def timer(func=None, *, label=None, store=None):
-    """
-    Mesure le temps d'exécution.
+class Tag(StrEnum):
+    CATEGORY = "category"
+    ORIGIN = "origin"
+    LABEL = "label"
+    ADDITIVE = "additive"
+    BRAND = "brand"
+    INGREDIENT = "ingredient"
 
-    Utilisable de 4 façons :
-        @timer
-        @timer(label="chargement")
-        @timer(store=timings)             # timings[nom] = durée (dict fourni)
-        @timer(label="load", store=timings)
+    @property
+    def plural(self) -> str:
+        """Nom des tables et des colonnes de tags : categories, origins..."""
+        return "categories" if self is Tag.CATEGORY else f"{self}s"
 
-    Fonctionne sur n'importe quelle fonction OU méthode (grâce à *args/**kwargs
-    et functools.wraps). Le temps est loggué même si la fonction lève.
-    """
-
-    def decorator(fn):
-        name = label or fn.__qualname__  # __qualname__ => "Classe.methode"
-
-        @functools.wraps(fn)  # garde nom, docstring, signature
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            try:
-                return fn(*args, **kwargs)
-            finally:
-                duration = time.perf_counter() - start
-                print(f"[{name}] {duration:.3f} s")
-                if store is not None:
-                    store[name] = duration
-
-        return wrapper
-
-    # @timer          -> func est la fonction        -> on décore tout de suite
-    # @timer(...)      -> func est None              -> on renvoie le décorateur
-    return decorator(func) if callable(func) else decorator
-
+KEY_NUTRIENTS = [
+    "energy_100g",
+    "sugars_100g",
+    "carbohydrates_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "salt_100g",
+    "proteins_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "fruits-vegetables-legumes_100g"
+]
 
 COLUMNS = [
     # Général
@@ -53,12 +53,14 @@ COLUMNS = [
     "product_name",
     "quantity",
     "nutrition_data_per",
+    "last_modified_t",
 
     # Classification
     "brands_tags",
     "categories_tags",
     "labels_tags",
     "origins_tags",
+    "food_groups_tags",
 
     # Ingrédients
     "ingredients_tags",
