@@ -189,6 +189,14 @@ def load_database(conn_duckdb: DuckDBPyConnection) -> int:
         constraints = drop_constraints(conn_psql, JUNCTION_TABLES)
 
     with engine.begin() as conn_psql:
+        # Référentiels des tags et des rayons avant products, dont les FK (non retirées) les référencent
+        for tag in Tag:
+            insert(rel_reader.get_tags(tag), tag.plural)
+            print(f"✔ {tag.plural}")
+
+        insert(rel_reader.get_foodgroups(), "foodgroups")
+        print("✔ foodgroups")
+
         products = rel_reader.get_products()
         insert(products, "products")
         print("✔ products")
@@ -204,12 +212,7 @@ def load_database(conn_duckdb: DuckDBPyConnection) -> int:
         insert(products_secondary_nutrients, "products_secondary_nutrients")
         print("✔ products_secondary_nutrients")
 
-        # Table du tag (id, name) avant sa table de liaison, qui la référence
         for tag in Tag:
-            df_tags = rel_reader.get_tags(tag)
-            insert(df_tags, tag.plural)
-            print(f"✔ {tag.plural}")
-
             df_relations = rel_reader.get_product_relations(tag)
             insert(df_relations, f"products_{tag.plural}")
             print(f"✔ products_{tag.plural}")
