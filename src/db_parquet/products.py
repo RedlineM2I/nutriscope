@@ -1,6 +1,6 @@
 from duckdb import DuckDBPyConnection
 
-from src.config import COLUMNS, PARQUET_FILE, PARQUET_FR
+from src.config import COLUMNS, PARQUET_FILE, PARQUET_FR, TAG_COLUMNS
 
 import pandas as pd
 import duckdb
@@ -30,14 +30,8 @@ def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
             environmental_score_grade,
             environmental_score_score,
 
-            "brands_tags",
-            "categories_tags",
-            "labels_tags",
-            "origins_tags",
-            "food_groups_tags",
+            {",".join(TAG_COLUMNS)},
         
-            "ingredients_tags",
-            "additives_tags",
             
             list_extract(list_filter(nutriments, x -> x.name = 'energy-kj'), 1)."100g" AS energy_100g,
             list_extract(list_filter(nutriments, x -> x.name = 'energy-kcal'), 1)."100g" AS 'energy-kcal_100g',
@@ -62,13 +56,14 @@ def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
             ) AS nutriments_secondaires
         FROM '{PARQUET_FR}'
     """
+
     return conn.sql(query).df()
 
 
 def get_products_from(country: str):
     duckdb.sql(f"""
         COPY (
-            SELECT {', '.join(COLUMNS)}
+            SELECT {",".join(COLUMNS)}
             FROM '{PARQUET_FILE}'
             WHERE list_contains(countries_tags, '{country}')
         ) TO '{PARQUET_FR}' (FORMAT PARQUET)

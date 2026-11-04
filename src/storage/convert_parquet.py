@@ -1,4 +1,5 @@
 import json, shutil
+import time
 from pathlib import Path
 import duckdb
 
@@ -11,6 +12,7 @@ SCHEMA_COLUMNS = {
     "food_group": ("VARCHAR", "slug de la catégorie, sert de clé de partition ('unknown' si vide)"),
     "main_category": ("VARCHAR", "catégorie principale, texte normalisé"),
     "additives_n": ("SMALLINT", "nombre d'additifs, petit entier positif"),
+    "brand": ("VARCHAR","première marque de la liste brands_tags"),
     "nutriscore_score": ("SMALLINT", "intervalle réel d'environ -15 à 40, tient sur 2 octets"),
     "last_modified_t": ("TIMESTAMP", "epoch en secondes converti via to_timestamp"),
     "nutriscore_grade": ("VARCHAR", "grade a-e, unknown, not-applicable ou NULL"),
@@ -24,6 +26,7 @@ def _create_request() -> str:
         "product_name",
         "food_group",
         "main_category",
+        "brands_tags[1] as brand",
         "CAST(len(additives_tags) AS SMALLINT) AS additives_n",
         "CAST(nutriscore_score AS SMALLINT) AS nutriscore_score",
         "to_timestamp(CAST(last_modified_t AS BIGINT))::TIMESTAMP AS last_modified_t",
@@ -68,5 +71,8 @@ def convert_parquet():
 
 
 if __name__ == "__main__":
+    start = time.perf_counter()
     n = convert_parquet()
+    end = time.perf_counter()
+    print("Temps d'exécution : ", end - start)
     write_schema(n)

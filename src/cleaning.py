@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 
 from src.models import Report
 from src.strategy import DEFAULT_STRATEGY
-from src.config import KEY_NUTRIENTS
+from src.config import KEY_NUTRIENTS, TAG_COLUMNS, ENERGY_COL
 
 import pandas as pd
 import numpy as np
@@ -24,15 +24,6 @@ MAX_RELATIVE_GAP = 0.5                 # 50 % d'écart toléré entre kcal décl
 COUNTER_COLUMNS = ["nutriscore_score", "nova_group"]
 
 # Colonnes de tags qui deviennent des tables relationnelles (voir FlatToRelational)
-TAG_COLUMNS = [
-    "brands_tags",
-    "categories_tags",
-    "food_groups_tags",
-    "labels_tags",
-    "origins_tags",
-    "ingredients_tags",
-    "additives_tags",
-]
 
 GRADE_COLUMNS = ["nutriscore_grade", "environmental_score_grade"]
 LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
@@ -262,19 +253,17 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     # Nombre de lignes touchées (au moins une modification sur la ligne).
     touched_rows_mask = pd.Series(False, index=res.index)
     nutrients = KEY_NUTRIENTS.copy()
+    nutrients.remove(ENERGY_COL)
 
     for col in nutrients:
         if col not in res.columns:
             continue
 
         series = pd.to_numeric(res[col], errors="coerce").copy()
-        if col == "energy_100g":
-            above_bound_mask = pd.Series(False, index=series.index)
-        else:
-            max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
-            above_bound_mask = series > max_bound
+        max_bound = SODIUM_MAX if col == "sodium_100g" else NUTRIMENT_MAX
 
         negatives_mask = series < 0
+        above_bound_mask = series > max_bound
         invalid_values_mask = negatives_mask | above_bound_mask
 
         series.loc[invalid_values_mask] = pd.NA
@@ -482,7 +471,7 @@ def set_column_types(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
     df["code"] = df["code"].astype("string")
     for col in COUNTER_COLUMNS:
         df[col] = df[col].astype("Int64")
-    for col in KEY_NUTRIENTS:
+    for col in KEY_NUTRIENTS + ["energy_100g"]:
         df[col] = df[col].astype("float64")
 
     report = Report(
@@ -713,7 +702,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
             case _:
                 raise ValueError(f"Décision inconnue '{decision}' pour la colonne '{column}'")
 
-        details[f"{column} -> {decision.split(':')[0]}"] = nb
+        details[f"{column} → {decision.split(':')[0]}"] = nb
 
     # Suppression des lignes sans aucun nutriment clé
     no_key_nutrient_mask = res[KEY_NUTRIENTS].isna().all(axis=1)
