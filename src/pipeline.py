@@ -29,6 +29,8 @@ from src.db_psql.schema import create_tables
 from src.flat_to_relational import FlatToRelational
 from src.models import StepReport
 from src.music import background_music
+from src.storage.convert_parquet import convert_parquet, write_schema
+from src.storage.export_features import build_schema, write_parquet
 
 
 JUNCTION_TABLES = [
@@ -44,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--clean", action="store_true", help="Apply all the cleaning rules to the dataset")
     group.add_argument("--load_database", action="store_true", help="Convert parquet file to a relational dataframes and load them into the database")
     group.add_argument("--extract_parquet", action="store_true", help="Extract a parquet file partioned by categorie")
-    group.add_argument("--build_datasets", action="store_true", help="Create a dataset to exploit it in the ML phase")
+    group.add_argument("--build_dataset", action="store_true", help="Create a dataset to exploit it in the ML phase")
     group.add_argument("--all", action="store_true", help="Run all the pipeline from the beginning")
     return parser.parse_args()
 
@@ -90,12 +92,25 @@ def step_load_database() -> StepReport:
     rows = load_database(conn_duckdb)
     return StepReport("load_database", time.perf_counter() - start, rows)
 
+def step_extract_parquet() -> StepReport:
+    start = time.perf_counter()
+    rows = convert_parquet()
+    write_schema(rows)
+    return StepReport("extract_parquet", time.perf_counter() - start, rows)
+
+def step_build_dataset():
+    start = time.perf_counter()
+    path = write_parquet(force=True)
+    build_schema(path)
+    return StepReport("build_dataset", time.perf_counter() - start, 0)
 
 # Ordre d'exécution de --all ; la clé est le nom de l'option de la ligne de commande
 STEPS = {
     "download": step_download,
     "clean": step_clean,
     "load_database": step_load_database,
+    "extract_parquet": step_extract_parquet,
+    "build_dataset": step_build_dataset
 }
 
 
