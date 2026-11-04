@@ -220,3 +220,6 @@ data/export
 notebooks/drafts/
 
 src/drafts
+docs/data/registre_hypotheses.csv
+notebooks/figures
+docs/annexes/data/echantillon_france.csv
