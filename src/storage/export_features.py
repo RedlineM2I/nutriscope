@@ -7,7 +7,7 @@ import duckdb
 import pandas as pd
 from _duckdb import DuckDBPyConnection
 from pathlib import Path
-from config import PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR
+from src.config import PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR
 
 KEY_NUTRIENTS = [
     "energy-kcal_100g",

@@ -1,11 +1,20 @@
+"""Conversion du Parquet nettoyé en dataset partitionné par food_group (TP 12).
+
+Le script relit le Parquet nettoyé avec DuckDB, applique les types définis
+dans `SCHEMA_COLUMNS` (un CAST par colonne, nutriments en FLOAT), puis écrit
+un Parquet compressé ZSTD partitionné par `food_group`. Un fichier JSON
+décrivant le schéma (types et justifications) est généré à côté.
+
+Données : © Open Food Facts contributors, ODbL.
+"""
 import json, shutil
 import time
 from pathlib import Path
 import duckdb
 
-from config import KEY_NUTRIENTS
-from src.config import PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON
+from src.config import KEY_NUTRIENTS, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON
 
+# Colonne -> (type DuckDB, justification du choix), reprise telle quelle dans le schéma JSON
 SCHEMA_COLUMNS = {
     "code": ("VARCHAR", "un code-barres n'est pas un nombre, on garde les zéros de tête"),
     "product_name": ("VARCHAR", "texte libre, tel que dans le nettoyé"),
@@ -21,6 +30,15 @@ SCHEMA_COLUMNS = {
 
 
 def _create_request() -> str:
+    """
+    Construit la requête COPY qui convertit le Parquet nettoyé en Parquet partitionné.
+
+    Chaque colonne est castée vers le type le plus compact possible (voir `SCHEMA_COLUMNS`),
+    la marque est réduite au premier élément de `brands_tags`, les additifs sont comptés
+    et `last_modified_t` passe d'un epoch en secondes à un TIMESTAMP.
+
+    :return: Requête SQL DuckDB prête à être exécutée
+    """
     columns = [
         "CAST(code AS VARCHAR) AS code",
         "product_name",
@@ -45,6 +63,15 @@ def _create_request() -> str:
     """
 
 def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
+    """
+    Écrit le schéma du dataset partitionné au format JSON.
+
+    Le fichier contient la clé de partition, la compression, le nombre de lignes,
+    la licence et, pour chaque colonne, son type et la raison de ce choix.
+
+    :param n_rows: Nombre de lignes du dataset partitionné
+    :param path: Chemin du fichier JSON à écrire (créé avec ses dossiers parents si besoin)
+    """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)   # ← évite le plantage
     schema = {
@@ -56,7 +83,15 @@ def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
     }
     p.write_text(json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8")
 
-def convert_parquet():
+def convert_parquet() -> int:
+    """
+    Convertit le Parquet nettoyé en dataset Parquet partitionné par food_group.
+
+    Le dossier de sortie est supprimé avant l'écriture pour que la conversion soit
+    rejouable sans laisser de partition orpheline.
+
+    :return: Nombre de lignes relues dans le dataset partitionné
+    """
     if Path(PARQUET_CLEAN_BY_FOOD_GROUP).exists():
         shutil.rmtree(PARQUET_CLEAN_BY_FOOD_GROUP)  # rejouable, pas de partition orpheline
     Path(PARQUET_CLEAN_BY_FOOD_GROUP).parent.mkdir(parents=True, exist_ok=True)
