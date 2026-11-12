@@ -210,11 +210,9 @@ __marimo__/
 # PyCharm
 .idea/
 
-# Data files
-data/*.parquet
-data/*.mp3
-data/export*.parquet
-data/export
+# Données : le dépôt contient le code qui les produit, jamais les données (TP 13).
+# Le / initial limite la règle au data/ de la racine (docs/data/ reste versionné).
+/data/
 
 # Notebooks de brouillon
 notebooks/drafts/

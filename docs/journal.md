@@ -174,3 +174,37 @@ Les dictionnaires stockés dans les colonnes sont plutôt difficiles à gérer, 
 ### TP-9
 
 Dans ce tp on a fait le choix de ne pas recontroler le ratio 4/4/9 pour les kcal inférieures à 1 kcal/100g
+
+### TP-13
+
+Pipeline bout-en-bout, jalon J3 (tag `v0.3`). Documentation : [docs/data/pipeline.md](data/pipeline.md).
+
+**Choix**
+
+- Orchestration par la CLI existante (`python -m src.pipeline --all` et une option par étape), sans Makefile ni orchestrateur : le flux complet prend environ 5 minutes sur une machine. Les noms d'étapes restent ceux du projet, en anglais (`download`, `clean`, `load_database`, `extract_parquet`, `build_dataset`).
+- Toutes les sorties sont datées (AAAAMMJJ). Une étape lit la sortie du jour de l'étape précédente, sinon la plus récente, sinon elle échoue en disant quelle étape lancer.
+- Le brut France est figé dans `data/raw/` avec un manifeste (SHA-256 de la source et du brut). Le parquet de 8 Go n'est retéléchargé que s'il manque ou avec `--force`. `NUTRISCOPE_SOURCE` permet de partir d'un échantillon.
+- Idempotence : tri par code et écriture sur un seul thread pour le brut, le Parquet partitionné et l'export. Deux passages donnent les mêmes octets (vérifié par SHA-256, aussi sur le jeu complet).
+- Le dossier partitionné reçoit un `_SUCCESS` écrit en dernier ; `build_dataset` ignore un dossier sans marqueur.
+- Split train/test : stratifié sur `nutriscore_grade`, 20 % de test, graine 42. Fait en SQL (classement par `md5(code || '42')` dans chaque grade) plutôt qu'avec numpy : plus court, et l'affectation d'un produit ne dépend que de son code. L'export refuse de s'écraser sans `--force`.
+- `load_database` et `extract_parquet` vérifient qu'ils ont autant de produits que le nettoyé (548 913 sur le jeu complet).
+- Journal des durées : `data/logs/pipeline.jsonl`, une ligne par étape, échecs compris.
+- `requirements.txt` réencodé en UTF-8 (il était en UTF-16) et réduit au pipeline ; les notebooks ont `requirements-notebooks.txt`.
+
+**Corrections en passant**
+
+- Tests du nettoyage cassés depuis le TP 12 (colonne passée deux fois à `make_product`) ; quatre attentes réalignées sur le code.
+- `limit_nutriments` ne traitait plus les énergies négatives depuis le TP 12 : kcal et kJ négatives repassent à NA.
+- Import de `date` manquant dans `export_features.py`.
+- Les ✔ / ✘ faisaient planter l'affichage sur une console Windows en cp1252 (trouvé au test sur clone neuf) : la sortie est forcée en UTF-8.
+
+**Test machine vierge**
+
+- Clone neuf, venv neuf, `pip install -r requirements.txt`, `.env` rempli, `NUTRISCOPE_SOURCE` vers un échantillon de 20 000 produits : 86 tests verts, les cinq étapes passent en 4,4 s.
+- Reste à faire : l'échange avec une autre équipe et ses retours écrits.
+
+**Dette**
+
+- `docs/data/rapport_nettoyage.md` est versionné mais réécrit par chaque `clean` : un `git status` le montre modifié après une exécution.
+- `data/exports/schema.json` n'est pas daté : un export d'un autre jour réécrit le schéma du précédent.
+- `docs/data/architecture.md` cite encore d'anciens chemins (`data/food_france.parquet`, `data/parquet/produits`).

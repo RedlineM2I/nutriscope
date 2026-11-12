@@ -1,11 +1,15 @@
 from _duckdb import DuckDBPyConnection
 
-from src.config import PARQUET_CLEAN_DATASET, Tag
+from pathlib import Path
+
+from src.config import Tag
 
 class FlatToRelational:
 
-    def __init__(self, conn: DuckDBPyConnection):
+    def __init__(self, conn: DuckDBPyConnection, source: Path):
+        """:param source: Parquet nettoyé à découper (le même que celui du Parquet partitionné)"""
         self.conn = conn
+        self.source = source
         
     def create_products(self):
         """
@@ -15,7 +19,7 @@ class FlatToRelational:
         self.conn.sql(f"""
             CREATE OR REPLACE TEMP TABLE products AS
             SELECT row_number() over () as id, *
-            FROM '{PARQUET_CLEAN_DATASET}'
+            FROM '{self.source}'
         """)
 
     def create_product_relations(self, field: Tag):

@@ -16,9 +16,11 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from config import BASE_DIR
-from src.config import PARQUET_CLEAN_BY_FOOD_GROUP, PARQUET_CLEAN_DATASET
+from src.outputs import latest_clean, latest_partitioned
 
-PARTITIONED_GLOB = Path(PARQUET_CLEAN_BY_FOOD_GROUP + "/**/*.parquet")
+# Sorties les plus récentes du pipeline (celles du jour si elles existent)
+PARQUET_CLEAN_DATASET = latest_clean().as_posix()
+PARTITIONED_GLOB = Path(f"{latest_partitioned()}/**/*.parquet")
 REPORT_PATH = Path(f"{BASE_DIR.parent}/docs/data/benchmark.md")
 FOOD_GROUP = "sugary-snacks"  # à remplacer par un food_group réel du jeu
 TOP_N = 20
