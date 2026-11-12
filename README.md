@@ -102,10 +102,6 @@ L'export ML est **figé** : relancer `--build_dataset` le même jour est refusé
 Pour le réécrire en l'assumant : `python -m src.pipeline --build_dataset --force`
 (avec la même graine, il redonne exactement le même fichier).
 
-> **Windows** : si l'affichage plante sur `UnicodeEncodeError` (console en cp1252),
-> lancer d'abord `set PYTHONIOENCODING=utf-8` (cmd), `$env:PYTHONIOENCODING="utf-8"` (PowerShell)
-> ou `export PYTHONIOENCODING=utf-8` (Git Bash).
-
 ## 6. Sortie attendue
 
 En fin d'exécution, un récapitulatif affiche une ligne par étape (durée, lignes, fichiers) :

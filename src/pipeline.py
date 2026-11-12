@@ -313,6 +313,8 @@ def export_to_parquet(schema: str = "public") -> None:
 
 
 if __name__ == "__main__":
+    # Les ✔ / ✘ plantent sur une console Windows en cp1252 (sortie redirigée) : on force l'UTF-8
+    sys.stdout.reconfigure(encoding="utf-8")
     subprocess.call('cls', shell=True)
     main()
     
