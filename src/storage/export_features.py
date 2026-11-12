@@ -7,7 +7,6 @@ L'export est figé : il refuse de s'écraser sans `force=True`.
 
 Données : © Open Food Facts contributors, ODbL.
 """
-import hashlib
 import json
 import subprocess
 from datetime import date
@@ -18,7 +17,7 @@ from _duckdb import DuckDBPyConnection
 from pathlib import Path
 from src.config import (PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR, TODAY, SUCCESS_MARKER,
                         EXPORTS_DIR, SPLIT_SEED, TEST_SIZE)
-from src.outputs import latest_partitioned
+from src.outputs import latest_partitioned, sha256_file
 
 KEY_NUTRIENTS = [
     "energy-kcal_100g",
@@ -150,13 +149,6 @@ def write_parquet(force: bool = False, source: str | None = None,
         COPY ({build_select(source)}) TO '{path.as_posix()}'
         (FORMAT PARQUET, COMPRESSION ZSTD)""")
     return path
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as file :
-        for chunk in iter(lambda: file.read(4096), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 def _split_counts(con: DuckDBPyConnection, file: str) -> dict[str, dict]:
     """Effectifs train / test et part de test pour chaque grade, relus dans le fichier écrit."""

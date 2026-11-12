@@ -1,15 +1,18 @@
 from duckdb import DuckDBPyConnection
 
-from src.config import COLUMNS, PARQUET_FILE, PARQUET_FR, TAG_COLUMNS
+from pathlib import Path
+
+from src.config import COLUMNS, TAG_COLUMNS
 
 import pandas as pd
 import duckdb
 
 
-def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
+def extract_products(conn: DuckDBPyConnection, source: Path) -> pd.DataFrame:
     """
     Extrait les produits du parquet brut, nutriments aplatis
     :param conn: Connexion à la base DuckDB
+    :param source: Parquet brut du périmètre (sortie de l'étape download)
     :return: Dataframe des produits
     """
     query = f"""
@@ -54,17 +57,28 @@ def extract_products(conn: DuckDBPyConnection) -> pd.DataFrame:
                     'salt', 'proteins', 'fiber', 'fruits-vegetables-nuts', 'fruits-vegetables-legumes'
                 )
             ) AS nutriments_secondaires
-        FROM '{PARQUET_FR}'
+        FROM '{source}'
     """
 
     return conn.sql(query).df()
 
 
-def get_products_from(country: str):
-    duckdb.sql(f"""
+def get_products_from(source: Path, dest: Path, country: str) -> int:
+    """
+    Fige le brut du périmètre : colonnes utiles des produits vendus dans le pays, triés par code.
+    Le code-barres est écrit en texte (zéros de tête conservés).
+    :return: Nombre de produits écrits
+    """
+    columns = ["CAST(code AS VARCHAR) AS code" if c == "code" else c for c in COLUMNS]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    con.execute("SET threads = 1")  # écriture déterministe : mêmes octets à chaque exécution
+    con.execute(f"""
         COPY (
-            SELECT {",".join(COLUMNS)}
-            FROM '{PARQUET_FILE}'
+            SELECT {",".join(columns)}
+            FROM '{source}'
             WHERE list_contains(countries_tags, '{country}')
-        ) TO '{PARQUET_FR}' (FORMAT PARQUET)
+            ORDER BY code
+        ) TO '{dest}' (FORMAT PARQUET)
     """)
+    return con.execute(f"SELECT count(*) FROM read_parquet('{dest}')").fetchone()[0]

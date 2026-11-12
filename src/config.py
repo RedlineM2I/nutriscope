@@ -6,11 +6,18 @@ from datetime import date
 
 BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 
-PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
-CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
-PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
-# PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
 TODAY = date.today().strftime("%Y%m%d")
+
+# Source brute : le parquet Open Food Facts téléchargé, sauf si la variable
+# d'environnement NUTRISCOPE_SOURCE désigne un autre parquet (échantillon, extrait)
+PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
+SOURCE_ENV = "NUTRISCOPE_SOURCE"
+CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
+
+# Brut figé du jour (périmètre France) et son manifeste (empreinte de la source)
+RAW_DIR = BASE_DIR.parent / "data" / "raw"
+PARQUET_FR = f"{RAW_DIR}/food_france_{TODAY}.parquet"
+RAW_MANIFEST = f"{RAW_DIR}/manifest_{TODAY}.json"
 
 # Sorties datées du jour (écriture). Pour lire, passer par src.outputs, qui retombe
 # sur la sortie la plus récente quand celle du jour n'existe pas.

@@ -15,9 +15,10 @@ import time
 
 from pathlib import Path
 from duckdb import DuckDBPyConnection, connect
+from sqlalchemy import text
 
 from src import cleaning, fetch_data
-from src.config import (PARQUET_FILE, PARQUET_FR, EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP,
+from src.config import (PARQUET_FILE, PARQUET_FR, RAW_MANIFEST, SOURCE_ENV, EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP,
                         SCHEMA_PRODUIT_JSON, EXPORT_CLEANING_REPORT, ELEVATOR, PIPELINE_LOG, Tag)
 from src.console import timer, title1, title2
 from src.report import generate_report
@@ -31,7 +32,9 @@ from src.db_psql.schema import create_tables
 from src.flat_to_relational import FlatToRelational
 from src.models import StepReport
 from src.music import background_music
-from src.outputs import latest_clean, require_france, run_step
+from src.outputs import (check_same_count_as_clean, latest_clean, latest_raw, run_step, source_override,
+                         write_manifest)
+from src.fetch_data import URL
 from src.storage.convert_parquet import convert_parquet, write_schema
 from src.storage.export_features import build_schema, write_parquet
 
@@ -69,38 +72,52 @@ CLEANING_RULES = [
 ]
 
 def step_download(force: bool = False) -> StepReport:
-    """Télécharge le brut puis le restreint à la France ; lignes = produits du périmètre."""
+    """
+    Fige le brut du jour (périmètre France) et son manifeste ; lignes = produits du périmètre.
+
+    La source est le parquet désigné par NUTRISCOPE_SOURCE, sinon le parquet Open Food Facts,
+    téléchargé seulement s'il est absent (ou avec --force).
+    """
     start = time.perf_counter()
-    with background_music(ELEVATOR, play=False):
-        download()
-    filter_country(country="en:france")
-    rows = connect().execute(f"SELECT count(*) FROM read_parquet('{PARQUET_FR}')").fetchone()[0]
-    return StepReport("download", time.perf_counter() - start, rows, [PARQUET_FILE, PARQUET_FR])
+    source = source_override()
+    origin = f"{SOURCE_ENV}={source}" if source else URL
+    if source is None:
+        source = Path(PARQUET_FILE)
+        if force or not source.exists():
+            with background_music(ELEVATOR, play=False):
+                download()
+    country = "en:france"
+    rows = filter_country(source, Path(PARQUET_FR), country)
+    write_manifest(source, origin, Path(PARQUET_FR), rows, country, Path(RAW_MANIFEST))
+    return StepReport("download", time.perf_counter() - start, rows, [str(source), PARQUET_FR, RAW_MANIFEST])
 
 def step_clean(force: bool = False) -> StepReport:
     """Nettoie le périmètre France ; lignes = produits conservés après la dernière règle."""
     title2("Nettoyage des données")
     start = time.perf_counter()
-    require_france()
     conn_duckdb = connect()
-    products = extract_products(conn_duckdb)
+    products = extract_products(conn_duckdb, latest_raw())
     rows = clean(products)
     return StepReport("clean", time.perf_counter() - start, rows, [PARQUET_CLEAN_DATASET, str(EXPORT_CLEANING_REPORT)])
 
 def step_load_database(force: bool = False) -> StepReport:
-    """Recrée et remplit la base ; lignes = total inséré, tables de liaison comprises."""
+    """Recrée et remplit la base ; lignes = produits de la table products, autant que dans le nettoyé."""
     start = time.perf_counter()
+    clean_file = latest_clean()
     reset_database()
     # Les tables temporaires DuckDB vivent dans cette connexion : même connexion pour les deux étapes
     conn_duckdb = connect()
-    flatten_to_relational(conn_duckdb)
-    rows = load_database(conn_duckdb)
+    flatten_to_relational(conn_duckdb, clean_file)
+    load_database(conn_duckdb)
+    rows = check_same_count_as_clean("load_database", count_products_in_database(), clean_file)
     return StepReport("load_database", time.perf_counter() - start, rows)
 
 def step_extract_parquet(force: bool = False) -> StepReport:
     """Partitionne le nettoyé le plus récent par food_group (dossier du jour + _SUCCESS)."""
     start = time.perf_counter()
-    rows = convert_parquet(latest_clean(), Path(PARQUET_CLEAN_BY_FOOD_GROUP))
+    clean_file = latest_clean()
+    rows = convert_parquet(clean_file, Path(PARQUET_CLEAN_BY_FOOD_GROUP))
+    check_same_count_as_clean("extract_parquet", rows, clean_file)
     write_schema(rows)
     return StepReport("extract_parquet", time.perf_counter() - start, rows, [PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON])
 
@@ -153,11 +170,12 @@ def download() -> None:
 
 
 @timer(label="Filtre sur le périmètre")
-def filter_country(country: str = "en:france") -> None:
-    """Restreint le parquet aux colonnes utiles et aux produits vendus dans le pays."""
+def filter_country(source: Path, dest: Path, country: str = "en:france") -> int:
+    """Restreint le parquet aux colonnes utiles et aux produits vendus dans le pays. Retourne le nombre de produits."""
     title2("Filtre sur le périmètre du fichier parquet (colonnes sélectionnées et produits en France)")
-    get_products_from(country=country)
-    print("✔ food.parquet → food_france.parquet")
+    rows = get_products_from(source, dest, country)
+    print(f"✔ {source.name} → {dest.name}")
+    return rows
 
 
 @timer(label="Nettoyage")
@@ -189,10 +207,10 @@ def reset_database() -> None:
 
 
 @timer(label="Conversion en tables relationnelles")
-def flatten_to_relational(conn_duckdb: DuckDBPyConnection) -> None:
+def flatten_to_relational(conn_duckdb: DuckDBPyConnection, clean_file: Path) -> None:
     """Découpe le parquet nettoyé en tables temporaires DuckDB, au format du schéma PostgreSQL."""
     title2("Conversion du fichier parquet en tables relationnelles")
-    flat_to_rel = FlatToRelational(conn=conn_duckdb)
+    flat_to_rel = FlatToRelational(conn=conn_duckdb, source=clean_file)
 
     flat_to_rel.create_products()
     print("✔ products")
@@ -252,6 +270,12 @@ def load_database(conn_duckdb: DuckDBPyConnection) -> int:
     restore_constraints(engine, constraints)
     print("✔ contraintes restaurées")
     return total
+
+
+def count_products_in_database() -> int:
+    """Nombre de produits dans la table PostgreSQL products."""
+    with get_engine().connect() as conn_psql:
+        return conn_psql.execute(text("SELECT count(*) FROM products")).scalar_one()
 
 
 def export_to_parquet(schema: str = "public") -> None:
