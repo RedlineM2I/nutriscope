@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 import duckdb
 
-from src.config import KEY_NUTRIENTS, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON, SUCCESS_MARKER
+from src.config import KEY_NUTRIENTS, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON, SUCCESS_MARKER
+from src.outputs import latest_clean
 
 # Colonne -> (type DuckDB, justification du choix), reprise telle quelle dans le schéma JSON
 SCHEMA_COLUMNS = {
@@ -29,13 +30,14 @@ SCHEMA_COLUMNS = {
 }
 
 
-def _create_request() -> str:
+def _create_request(source: Path, dest: Path) -> str:
     """
     Construit la requête COPY qui convertit le Parquet nettoyé en Parquet partitionné.
 
     Chaque colonne est castée vers le type le plus compact possible (voir `SCHEMA_COLUMNS`),
     la marque est réduite au premier élément de `brands_tags`, les additifs sont comptés
     et `last_modified_t` passe d'un epoch en secondes à un TIMESTAMP.
+    Les lignes sont triées par code : deux conversions écrivent les mêmes octets.
 
     :return: Requête SQL DuckDB prête à être exécutée
     """
@@ -57,8 +59,9 @@ def _create_request() -> str:
         COPY (
             SELECT
             {select_clause}
-            FROM read_parquet('{PARQUET_CLEAN_DATASET}')
-        ) TO '{PARQUET_CLEAN_BY_FOOD_GROUP}' (FORMAT PARQUET, PARTITION_BY (food_group),
+            FROM read_parquet('{source}')
+            ORDER BY code
+        ) TO '{dest}' (FORMAT PARQUET, PARTITION_BY (food_group),
             COMPRESSION ZSTD, OVERWRITE_OR_IGNORE)
     """
 
@@ -83,9 +86,9 @@ def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
     }
     p.write_text(json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8")
 
-def convert_parquet() -> int:
+def convert_parquet(source: Path, dest: Path) -> int:
     """
-    Convertit le Parquet nettoyé en dataset Parquet partitionné par food_group.
+    Convertit le Parquet nettoyé `source` en dataset `dest` partitionné par food_group.
 
     Le dossier de sortie est supprimé avant l'écriture pour que la conversion soit
     rejouable sans laisser de partition orpheline. Le marqueur `_SUCCESS` est écrit
@@ -93,23 +96,23 @@ def convert_parquet() -> int:
 
     :return: Nombre de lignes relues dans le dataset partitionné
     """
-    if Path(PARQUET_CLEAN_BY_FOOD_GROUP).exists():
-        shutil.rmtree(PARQUET_CLEAN_BY_FOOD_GROUP)  # rejouable, pas de partition orpheline
-    Path(PARQUET_CLEAN_BY_FOOD_GROUP).parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)  # rejouable, pas de partition orpheline
+    dest.parent.mkdir(parents=True, exist_ok=True)
 
     con = duckdb.connect()
-    request = _create_request()
-    con.execute(request)
+    con.execute("SET threads = 1")  # écriture déterministe : mêmes fichiers, mêmes octets
+    con.execute(_create_request(source, dest))
     n = con.execute(
-        f"SELECT count(*) FROM read_parquet('{PARQUET_CLEAN_BY_FOOD_GROUP}/**/*.parquet', hive_partitioning=true)"
+        f"SELECT count(*) FROM read_parquet('{dest}/**/*.parquet', hive_partitioning=true)"
     ).fetchone()[0]
-    (Path(PARQUET_CLEAN_BY_FOOD_GROUP) / SUCCESS_MARKER).touch()  # en dernier, une fois tout écrit et relu
+    (dest / SUCCESS_MARKER).touch()  # en dernier, une fois tout écrit et relu
     return n
 
 
 if __name__ == "__main__":
     start = time.perf_counter()
-    n = convert_parquet()
+    n = convert_parquet(latest_clean(), Path(PARQUET_CLEAN_BY_FOOD_GROUP))
     end = time.perf_counter()
     print("Temps d'exécution : ", end - start)
     write_schema(n)

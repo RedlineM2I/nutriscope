@@ -2,10 +2,10 @@ import re
 from pathlib import Path
 import duckdb
 
-from config import PARQUET_CLEAN_BY_FOOD_GROUP
+from src.outputs import latest_partitioned
 
 SQL_FILE = Path("../sql/controles.sql")
-PARQUET_GLOB = Path(PARQUET_CLEAN_BY_FOOD_GROUP + "/**/*.parquet")
+PARQUET_GLOB = Path(f"{latest_partitioned()}/**/*.parquet")  # sortie la plus récente du pipeline
 REPORT = Path("../../docs/data/controle.md")
 MARKER = re.compile(r"^--\s*@nom:\s*(\w+)\s*$", re.MULTILINE)
 

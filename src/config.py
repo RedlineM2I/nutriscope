@@ -12,12 +12,18 @@ PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 # PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
 TODAY = date.today().strftime("%Y%m%d")
 
-PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean_{TODAY}.parquet"
-PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/products"
+# Sorties datées du jour (écriture). Pour lire, passer par src.outputs, qui retombe
+# sur la sortie la plus récente quand celle du jour n'existe pas.
+PARQUET_DIR = BASE_DIR.parent / "data" / "parquet"
+PARQUET_CLEAN_DATASET = f"{PARQUET_DIR}/food_clean_{TODAY}.parquet"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{PARQUET_DIR}/products_{TODAY}"
 # Marqueur écrit en dernier dans un dossier partitionné : son absence = écriture incomplète
 SUCCESS_MARKER = "_SUCCESS"
 
-SCHEMA_PRODUIT_JSON = f"{BASE_DIR.parent}/data/parquet/schema_products.json"
+SCHEMA_PRODUIT_JSON = f"{PARQUET_DIR}/schema_products_{TODAY}.json"
+
+# Journal des durées : une ligne JSON par étape terminée, échecs compris
+PIPELINE_LOG = BASE_DIR.parent / "data" / "logs" / "pipeline.jsonl"
 
 SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 

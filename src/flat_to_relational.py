@@ -1,6 +1,7 @@
 from _duckdb import DuckDBPyConnection
 
-from src.config import PARQUET_CLEAN_DATASET, Tag
+from src.config import Tag
+from src.outputs import latest_clean
 
 class FlatToRelational:
 
@@ -15,7 +16,7 @@ class FlatToRelational:
         self.conn.sql(f"""
             CREATE OR REPLACE TEMP TABLE products AS
             SELECT row_number() over () as id, *
-            FROM '{PARQUET_CLEAN_DATASET}'
+            FROM '{latest_clean().as_posix()}'
         """)
 
     def create_product_relations(self, field: Tag):

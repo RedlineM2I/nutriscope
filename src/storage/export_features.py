@@ -18,6 +18,7 @@ from _duckdb import DuckDBPyConnection
 from pathlib import Path
 from src.config import (PARQUET_CLEAN_BY_FOOD_GROUP, BASE_DIR, TODAY, SUCCESS_MARKER,
                         EXPORTS_DIR, SPLIT_SEED, TEST_SIZE)
+from src.outputs import latest_partitioned
 
 KEY_NUTRIENTS = [
     "energy-kcal_100g",
@@ -123,13 +124,16 @@ def check_success(folder: str = PARQUET_CLEAN_BY_FOOD_GROUP) -> None:
             "lancer d'abord `python -m src.pipeline --extract_parquet`."
         )
 
-def write_parquet(force: bool = False, source: str = PARQUET_CLEAN_BY_FOOD_GROUP,
+def write_parquet(force: bool = False, source: str | None = None,
                   export_dir: Path = EXPORTS_DIR) -> Path:
     """Écrit l'export features du jour, avec sa colonne `split`.
 
     :param force: réécrit l'export du jour s'il existe déjà (sinon FileExistsError)
+    :param source: dossier partitionné à lire (par défaut : le plus récent qui a son `_SUCCESS`)
     :return: chemin du fichier écrit
     """
+    if source is None:
+        source = str(latest_partitioned())
     check_success(source)
     path = Path(export_dir) / f"features_{TODAY}.parquet"
     if path.exists() and not force:

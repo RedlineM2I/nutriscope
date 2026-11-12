@@ -9,6 +9,7 @@ elles doivent être appelées l'une après l'autre dans le même processus.
 
 import os
 import subprocess
+import sys
 import argparse
 import time
 
@@ -16,7 +17,8 @@ from pathlib import Path
 from duckdb import DuckDBPyConnection, connect
 
 from src import cleaning, fetch_data
-from src.config import PARQUET_FILE, PARQUET_FR, EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, EXPORT_CLEANING_REPORT, ELEVATOR, Tag
+from src.config import (PARQUET_FILE, PARQUET_FR, EXPORT_PARQUET_DIR, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP,
+                        SCHEMA_PRODUIT_JSON, EXPORT_CLEANING_REPORT, ELEVATOR, PIPELINE_LOG, Tag)
 from src.console import timer, title1, title2
 from src.report import generate_report
 from src.db_parquet.nutriments import get_nutriments, get_secondary_nutrients_link_table
@@ -29,6 +31,7 @@ from src.db_psql.schema import create_tables
 from src.flat_to_relational import FlatToRelational
 from src.models import StepReport
 from src.music import background_music
+from src.outputs import latest_clean, require_france, run_step
 from src.storage.convert_parquet import convert_parquet, write_schema
 from src.storage.export_features import build_schema, write_parquet
 
@@ -78,6 +81,7 @@ def step_clean(force: bool = False) -> StepReport:
     """Nettoie le périmètre France ; lignes = produits conservés après la dernière règle."""
     title2("Nettoyage des données")
     start = time.perf_counter()
+    require_france()
     conn_duckdb = connect()
     products = extract_products(conn_duckdb)
     rows = clean(products)
@@ -94,10 +98,11 @@ def step_load_database(force: bool = False) -> StepReport:
     return StepReport("load_database", time.perf_counter() - start, rows)
 
 def step_extract_parquet(force: bool = False) -> StepReport:
+    """Partitionne le nettoyé le plus récent par food_group (dossier du jour + _SUCCESS)."""
     start = time.perf_counter()
-    rows = convert_parquet()
+    rows = convert_parquet(latest_clean(), Path(PARQUET_CLEAN_BY_FOOD_GROUP))
     write_schema(rows)
-    return StepReport("extract_parquet", time.perf_counter() - start, rows)
+    return StepReport("extract_parquet", time.perf_counter() - start, rows, [PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON])
 
 def step_build_dataset(force: bool = False) -> StepReport:
     """Écrit l'export ML figé (split train/test) ; refuse d'écraser celui du jour sans --force."""
@@ -122,13 +127,20 @@ def main():
     args = parse_args()
     title1("Projet Nutriscope")
 
-    reports = [step(force=args.force) for name, step in STEPS.items() if args.all or getattr(args, name)]
+    try:
+        reports = [run_step(name, step, force=args.force)
+                   for name, step in STEPS.items() if args.all or getattr(args, name)]
+    except (FileNotFoundError, FileExistsError) as e:
+        # Entrée manquante ou export figé : un message clair plutôt qu'une trace Python (déjà au journal)
+        print(f"✘ {e}")
+        sys.exit(1)
     if not reports:
         print("Aucune étape lancée (option absente ou pas encore implémentée).")
     else:
         title2("Récapitulatif")
         for r in reports:
             print(f"✔ {r.step:<14} {r.duration:8.1f} s {r.rows:>10} lignes  {', '.join(r.files)}")
+        print(f"Journal des durées : {PIPELINE_LOG}")
 
     # export_to_parquet()
 
