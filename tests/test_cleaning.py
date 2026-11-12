@@ -129,7 +129,6 @@ PRODUCTS = {
         product_name="Sans nutriment",
         rayon="Epicerie",
         **{column: None for column in KEY_NUTRIENTS},
-        **{"energy-kcal_100g": None},
     ),
     "groupe_manquant": make_product(
         code="8888888888888",
@@ -302,10 +301,10 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 3
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["brands_tags -> constant"] == 1
-        assert report.details["energy-kcal_100g -> flag"] == 1
-        assert report.details["nova_group -> mode"] == 1
-        assert report.details["quantity -> drop_column"] == 1
+        assert report.details["brands_tags → constant"] == 1
+        assert report.details["energy-kcal_100g → flag"] == 1
+        assert report.details["nova_group → mode"] == 1
+        assert report.details["quantity → drop_column"] == 1
         assert report.details["dropped_columns"] == ["quantity"]
         assert report.details["rows_dropped_no_nutrient"] == 0
 
@@ -330,7 +329,7 @@ class TestMissingValuesStrategy:
         assert report.lines_before == 4
         assert report.lines_after == 3
         assert report.affected_lines == 3
-        assert report.details["fat_100g -> foodgroup_median"] == 3
+        assert report.details["fat_100g → foodgroup_median"] == 3
         assert report.details["rows_dropped_no_nutrient"] == 1
 
 
@@ -360,7 +359,7 @@ class TestNormalizeTexts:
         assert pd.isna(result.loc["variante", "product_name"])
         assert pd.isna(result.loc["variante", "nutriscore_grade"])
         assert result.loc["nominal", "categories_tags"] == ["epicerie", "pates"]
-        assert result.loc["nominal", "food_groups_tags"] == ["en:cereals-and-potatoes"]  # hors périmètre
+        assert result.loc["nominal", "food_groups_tags"] == ["cereals-and-potatoes"]  # sert de nom de partition
         assert result.loc["variante", "brands_tags"] == ["marque-a"]  # graphie la plus fréquente
 
         assert report.rule == "normalize_texts"
@@ -452,6 +451,18 @@ class TestLimitNutriments:
         assert pd.isna(result["energy_100g"].iloc[0])
         assert report.details["energy_100g_negatifs"] == 1
         assert report.details["energy_100g_au_dessus"] == 0
+
+    def test_nominal_negative_kcal_becomes_na_but_high_kcal_is_kept(self):
+        # kcal > 100 est normal : la borne haute de l'énergie est gérée par fix_energy
+        result, report = limit_nutriments(pd.concat([
+            one_row({"energy-kcal_100g": -100.0}),
+            one_row({"energy-kcal_100g": 500.0}),
+        ], ignore_index=True))
+
+        assert pd.isna(result["energy-kcal_100g"].iloc[0])
+        assert result["energy-kcal_100g"].iloc[1] == 500.0
+        assert report.details["energy-kcal_100g_negatifs"] == 1
+        assert report.details["energy-kcal_100g_au_dessus"] == 0
 
     def test_nominal_above_100_becomes_na(self):
         result, report = limit_nutriments(one_row({"sugars_100g": 150.0, "carbohydrates_100g": 200.0}))
@@ -550,12 +561,6 @@ class TestFixEnergy:
 
         assert result["energy-kcal_100g"].iloc[0] == 150.0
         assert report.details["incoherentes_recalculees"] == 0
-
-    def test_negative_energy_is_corrected(self):
-        result, report = fix_energy(one_row({"energy_kcal_100g": -100.0}))
-
-        assert pd.isna(result["energy-kcal_100g"].iloc[0])
-        assert report.details["incoherentes_recalculees"] == 1
 
 
 # ============================================================

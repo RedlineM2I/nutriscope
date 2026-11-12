@@ -48,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--extract_parquet", action="store_true", help="Extract a parquet file partioned by categorie")
     group.add_argument("--build_dataset", action="store_true", help="Create a dataset to exploit it in the ML phase")
     group.add_argument("--all", action="store_true", help="Run all the pipeline from the beginning")
+    parser.add_argument("--force", action="store_true", help="Overwrite today's frozen ML export (build_dataset)")
     return parser.parse_args()
 
 # Ordre des règles : types, textes, doublons, unités, bornes, énergie, catégories, manquants.
@@ -64,7 +65,7 @@ CLEANING_RULES = [
     cleaning.missing_values_strategy,
 ]
 
-def step_download() -> StepReport:
+def step_download(force: bool = False) -> StepReport:
     """Télécharge le brut puis le restreint à la France ; lignes = produits du périmètre."""
     start = time.perf_counter()
     with background_music(ELEVATOR, play=False):
@@ -73,7 +74,7 @@ def step_download() -> StepReport:
     rows = connect().execute(f"SELECT count(*) FROM read_parquet('{PARQUET_FR}')").fetchone()[0]
     return StepReport("download", time.perf_counter() - start, rows, [PARQUET_FILE, PARQUET_FR])
 
-def step_clean() -> StepReport:
+def step_clean(force: bool = False) -> StepReport:
     """Nettoie le périmètre France ; lignes = produits conservés après la dernière règle."""
     title2("Nettoyage des données")
     start = time.perf_counter()
@@ -82,7 +83,7 @@ def step_clean() -> StepReport:
     rows = clean(products)
     return StepReport("clean", time.perf_counter() - start, rows, [PARQUET_CLEAN_DATASET, str(EXPORT_CLEANING_REPORT)])
 
-def step_load_database() -> StepReport:
+def step_load_database(force: bool = False) -> StepReport:
     """Recrée et remplit la base ; lignes = total inséré, tables de liaison comprises."""
     start = time.perf_counter()
     reset_database()
@@ -92,19 +93,21 @@ def step_load_database() -> StepReport:
     rows = load_database(conn_duckdb)
     return StepReport("load_database", time.perf_counter() - start, rows)
 
-def step_extract_parquet() -> StepReport:
+def step_extract_parquet(force: bool = False) -> StepReport:
     start = time.perf_counter()
     rows = convert_parquet()
     write_schema(rows)
     return StepReport("extract_parquet", time.perf_counter() - start, rows)
 
-def step_build_dataset():
+def step_build_dataset(force: bool = False) -> StepReport:
+    """Écrit l'export ML figé (split train/test) ; refuse d'écraser celui du jour sans --force."""
     start = time.perf_counter()
-    path = write_parquet(force=True)
-    build_schema(path)
-    return StepReport("build_dataset", time.perf_counter() - start, 0)
+    path = write_parquet(force=force)
+    rows = build_schema(path)
+    return StepReport("build_dataset", time.perf_counter() - start, rows, [str(path), str(path.parent / "schema.json")])
 
-# Ordre d'exécution de --all ; la clé est le nom de l'option de la ligne de commande
+# Ordre d'exécution de --all ; la clé est le nom de l'option de la ligne de commande.
+# Toutes les étapes ont la même signature (force) ; seule build_dataset s'en sert.
 STEPS = {
     "download": step_download,
     "clean": step_clean,
@@ -119,7 +122,7 @@ def main():
     args = parse_args()
     title1("Projet Nutriscope")
 
-    reports = [step() for name, step in STEPS.items() if args.all or getattr(args, name)]
+    reports = [step(force=args.force) for name, step in STEPS.items() if args.all or getattr(args, name)]
     if not reports:
         print("Aucune étape lancée (option absente ou pas encore implémentée).")
     else:

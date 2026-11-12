@@ -14,6 +14,8 @@ TODAY = date.today().strftime("%Y%m%d")
 
 PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean_{TODAY}.parquet"
 PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/products"
+# Marqueur écrit en dernier dans un dossier partitionné : son absence = écriture incomplète
+SUCCESS_MARKER = "_SUCCESS"
 
 SCHEMA_PRODUIT_JSON = f"{BASE_DIR.parent}/data/parquet/schema_products.json"
 
@@ -22,6 +24,11 @@ SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
 
 EXPORT_PARQUET_DIR = BASE_DIR.parent / "data" / "export"
+
+# Export figé pour la phase 4 (TP 14+) : la graine et la part de test ne changent plus
+EXPORTS_DIR = BASE_DIR.parent / "data" / "exports"
+SPLIT_SEED = 42
+TEST_SIZE = 0.2
 
 EXPORT_CLEANING_REPORT = BASE_DIR.parent / "docs" / "data" / "rapport_nettoyage.md"
 

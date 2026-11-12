@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 import duckdb
 
-from src.config import KEY_NUTRIENTS, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON
+from src.config import KEY_NUTRIENTS, PARQUET_CLEAN_DATASET, PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON, SUCCESS_MARKER
 
 # Colonne -> (type DuckDB, justification du choix), reprise telle quelle dans le schéma JSON
 SCHEMA_COLUMNS = {
@@ -88,7 +88,8 @@ def convert_parquet() -> int:
     Convertit le Parquet nettoyé en dataset Parquet partitionné par food_group.
 
     Le dossier de sortie est supprimé avant l'écriture pour que la conversion soit
-    rejouable sans laisser de partition orpheline.
+    rejouable sans laisser de partition orpheline. Le marqueur `_SUCCESS` est écrit
+    en dernier : un dossier sans marqueur est le reste d'une exécution interrompue.
 
     :return: Nombre de lignes relues dans le dataset partitionné
     """
@@ -102,6 +103,7 @@ def convert_parquet() -> int:
     n = con.execute(
         f"SELECT count(*) FROM read_parquet('{PARQUET_CLEAN_BY_FOOD_GROUP}/**/*.parquet', hive_partitioning=true)"
     ).fetchone()[0]
+    (Path(PARQUET_CLEAN_BY_FOOD_GROUP) / SUCCESS_MARKER).touch()  # en dernier, une fois tout écrit et relu
     return n
 
 
