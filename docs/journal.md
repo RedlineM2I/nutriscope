@@ -174,3 +174,16 @@ Les dictionnaires stockés dans les colonnes sont plutôt difficiles à gérer, 
 ### TP-9
 
 Dans ce tp on a fait le choix de ne pas recontroler le ratio 4/4/9 pour les kcal inférieures à 1 kcal/100g
+
+### TP 18 : Assistant conversationnel
+
+Système prompt qui la définit
+
+User demande "J'aime ce produit mais nutriscore pas terrible, qu'est-ce qui est mieux ?"
+
+L'IA fait appel à un outil chercher_produit qui récupère toutes les infos d'un produit.
+Elle fait ensuite appel à un deuxième outil : le modèle de substitution (ML) qui renvoie de meilleurs produits.
+
+Elle doit être capable de chercher un produit, récupérer les substitutions. Le prompt permet aussi normalement de faire plein d'autres choses
+
+C'est le prompt qui définit ses limites et ses fonctions.

@@ -6,7 +6,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent  # dossier contenant config.py (src/)
 
 PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
-CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 PARQUET_FR = f"{BASE_DIR.parent}/data/food_france.parquet"
 PARQUET_CLEAN_DATASET = f"{BASE_DIR.parent}/data/parquet/food_clean.parquet"
 PARQUET_CLEAN_BY_FOOD_GROUP = f"{BASE_DIR.parent}/data/parquet/products"
