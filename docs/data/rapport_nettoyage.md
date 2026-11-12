@@ -6,23 +6,23 @@
 
 ## 1. Volumétrie
  ### Avant nettoyage :  
- 1294426
+ 1296604
  ### Après nettoyage :  
- 548913
+ 549484
 
 
 ## 2. Rapport de nettoyage
  ### Tableau des rapports :  
  | Règle | Lignes avant | Lignes après | Lignes touchées | Détail |
 |---|---|---|---|---|
-| typer_colonnes | 1294426 | 1294426 | 0 ||
-| normalize_texts | 1294426 | 1294426 | 1267475 | noms_vides : 1 ; noms_majuscules : 15859 ; nutriscore_grade_unknown : 746922 ; environmental_score_grade_unknown : 796080 ; categories_tags_normalises : 685612 ; origins_tags_normalises : 402510 ; labels_tags_normalises : 702848 ; additives_tags_normalises : 370143 ; brands_tags_normalises : 728555 ; ingredients_tags_normalises : 370603 ; food_groups_tags_normalises : 1264149 ; marques_fusionnees : 90636 ;|
-| Dédupliquer les codes | 1294426 | 1294398 | 28 | sans_code : 0 ; doublons_supprimes : 28 ;|
-| normalize_units | 1294398 | 1294398 | 128128 | kcal_derivees : 364 ; kcal_recalculees : 114995 ; sel_derive : 1 ; sodium_derive : 0 ; sodium_recalcule : 13463 ;|
-| limit_nutriments | 1294398 | 1294398 | 3125 | energy-kcal_100g_negatifs : 8 ; energy-kcal_100g_au_dessus : 0 ; sugars_100g_negatifs : 0 ; sugars_100g_au_dessus : 45 ; carbohydrates_100g_negatifs : 0 ; carbohydrates_100g_au_dessus : 85 ; fat_100g_negatifs : 1 ; fat_100g_au_dessus : 45 ; saturated-fat_100g_negatifs : 1 ; saturated-fat_100g_au_dessus : 15 ; salt_100g_negatifs : 0 ; salt_100g_au_dessus : 55 ; proteins_100g_negatifs : 1 ; proteins_100g_au_dessus : 35 ; fiber_100g_negatifs : 19 ; fiber_100g_au_dessus : 21 ; sodium_100g_negatifs : 0 ; sodium_100g_au_dessus : 55 ; fruits-vegetables-legumes_100g_negatifs : 51 ; fruits-vegetables-legumes_100g_au_dessus : 2173 ; energy_100g_negatifs : 8 ; energy_100g_au_dessus : 0 ; sucres : 436 ; satures : 243 ;|
-| fix_energy | 1294398 | 1294398 | 5637 | nulles_recalculees : 389 ; nulles_invalidees_macros_aberrants : 0 ; >900_recalculees : 143 ; >900_invalidees : 73 ; incoherentes_recalculees : 5032 ;|
-| traiter_categories_vides | 1294398 | 639478 | 730189 | categorie_vide : 654920 ; food_group_derive_de_vide : 730189 ; food_group_unknown_total : 730189 ; inclassables_supprimes : 654920 ;|
-| strategie_manquants | 639478 | 548913 | 624437 | quantity → drop_column : 1 ; brands_tags → constant : 162102 ; labels_tags → constant : 292559 ; origins_tags → constant : 558076 ; ingredients_tags → constant : 312768 ; additives_tags → constant : 471228 ; energy-kcal_100g → flag : 111414 ; fat_100g → flag : 114987 ; saturated-fat_100g → flag : 117354 ; carbohydrates_100g → flag : 115139 ; sugars_100g → flag : 116553 ; fiber_100g → flag : 357951 ; proteins_100g → flag : 114438 ; salt_100g → flag : 130493 ; sodium_100g → flag : 130493 ; nova_group → mode : 318187 ; dropped_columns : ['quantity'] ; rows_dropped_no_nutrient : 90565 ;|
+| typer_colonnes | 1296604 | 1296604 | 0 ||
+| normalize_texts | 1296604 | 1296604 | 1269751 | noms_vides : 1 ; noms_majuscules : 15852 ; nutriscore_grade_unknown : 748916 ; environmental_score_grade_unknown : 797941 ; categories_tags_normalises : 686250 ; origins_tags_normalises : 403054 ; labels_tags_normalises : 705802 ; additives_tags_normalises : 370512 ; brands_tags_normalises : 729241 ; ingredients_tags_normalises : 370973 ; food_groups_tags_normalises : 1266426 ; marques_fusionnees : 91119 ;|
+| Dédupliquer les codes | 1296604 | 1296576 | 28 | sans_code : 0 ; doublons_supprimes : 28 ;|
+| normalize_units | 1296576 | 1296576 | 128248 | kcal_derivees : 358 ; kcal_recalculees : 115016 ; sel_derive : 1 ; sodium_derive : 0 ; sodium_recalcule : 13567 ;|
+| limit_nutriments | 1296576 | 1296576 | 3612 | energy-kcal_100g_negatifs : 8 ; energy-kcal_100g_au_dessus : 0 ; sugars_100g_negatifs : 0 ; sugars_100g_au_dessus : 45 ; carbohydrates_100g_negatifs : 0 ; carbohydrates_100g_au_dessus : 89 ; fat_100g_negatifs : 1 ; fat_100g_au_dessus : 43 ; saturated-fat_100g_negatifs : 1 ; saturated-fat_100g_au_dessus : 12 ; salt_100g_negatifs : 0 ; salt_100g_au_dessus : 49 ; proteins_100g_negatifs : 1 ; proteins_100g_au_dessus : 34 ; fiber_100g_negatifs : 20 ; fiber_100g_au_dessus : 21 ; sodium_100g_negatifs : 0 ; sodium_100g_au_dessus : 49 ; fruits-vegetables-legumes_100g_negatifs : 47 ; fruits-vegetables-legumes_100g_au_dessus : 2672 ; energy_100g_negatifs : 8 ; energy_100g_au_dessus : 0 ; sucres : 443 ; satures : 242 ;|
+| fix_energy | 1296576 | 1296576 | 5642 | nulles_recalculees : 391 ; nulles_invalidees_macros_aberrants : 0 ; >900_recalculees : 137 ; >900_invalidees : 74 ; incoherentes_recalculees : 5040 ;|
+| traiter_categories_vides | 1296576 | 640131 | 731790 | categorie_vide : 656445 ; food_group_derive_de_vide : 731790 ; food_group_unknown_total : 731790 ; inclassables_supprimes : 656445 ;|
+| strategie_manquants | 640131 | 549484 | 625048 | quantity → drop_column : 1 ; brands_tags → constant : 162240 ; labels_tags → constant : 292078 ; origins_tags → constant : 558672 ; ingredients_tags → constant : 313031 ; additives_tags → constant : 471690 ; energy-kcal_100g → flag : 111480 ; fat_100g → flag : 115037 ; saturated-fat_100g → flag : 117350 ; carbohydrates_100g → flag : 115212 ; sugars_100g → flag : 116609 ; fiber_100g → flag : 357676 ; proteins_100g → flag : 114495 ; salt_100g → flag : 130609 ; sodium_100g → flag : 130609 ; nova_group → mode : 318280 ; dropped_columns : ['quantity'] ; rows_dropped_no_nutrient : 90647 ;|
 
 
 
@@ -30,21 +30,21 @@
  ### Avant nettoyage :  
   Sucres > 100 g  : 45
 
- Matières grasses > 100 g  : 45
+ Matières grasses > 100 g  : 43
 
- Sel > 100 g  : 55
+ Sel > 100 g  : 49
 
- Protéines > 100 g  : 35
+ Protéines > 100 g  : 34
 
- Énergie > 3 800 kJ  : 113
+ Énergie > 3 800 kJ  : 107
 
- Somme des macronutriments > 100 g  : 2738
+ Somme des macronutriments > 100 g  : 2739
 
  Valeurs négatives  : 
 
  | energy_100g | sugars_100g | carbohydrates_100g | fat_100g | saturated-fat_100g | salt_100g | proteins_100g | fiber_100g | sodium_100g | fruits-vegetables-legumes_100g |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | 0 | 0 | 1 | 1 | 0 | 1 | 19 | 0 | 51 |
+| 8 | 0 | 0 | 1 | 1 | 0 | 1 | 20 | 0 | 47 |
 
 
 
@@ -73,76 +73,76 @@
 
 ## 4. Manquants
  ### Avant nettoyage :  
-  energy-kcal_100g : 379793
+  energy-kcal_100g : 380194
 
- sugars_100g : 387206
+ sugars_100g : 387597
 
- carbohydrates_100g : 386546
+ carbohydrates_100g : 386957
 
- fat_100g : 386778
+ fat_100g : 387174
 
- saturated-fat_100g : 388388
+ saturated-fat_100g : 388731
 
- salt_100g : 444280
+ salt_100g : 444922
 
- proteins_100g : 385122
+ proteins_100g : 385520
 
- fiber_100g : 897022
+ fiber_100g : 897699
 
- sodium_100g : 444279
+ sodium_100g : 444921
 
- fruits-vegetables-legumes_100g : 935997
+ fruits-vegetables-legumes_100g : 937765
 
 
  ### Après nettoyage :  
-  energy-kcal_100g : 20849
+  energy-kcal_100g : 20833
 
- sugars_100g : 25988
+ sugars_100g : 25962
 
- carbohydrates_100g : 24574
+ carbohydrates_100g : 24565
 
- fat_100g : 24422
+ fat_100g : 24390
 
- saturated-fat_100g : 26789
+ saturated-fat_100g : 26703
 
- salt_100g : 39928
+ salt_100g : 39962
 
- proteins_100g : 23873
+ proteins_100g : 23848
 
- fiber_100g : 267386
+ fiber_100g : 267029
 
- sodium_100g : 39928
+ sodium_100g : 39962
 
- fruits-vegetables-legumes_100g : 232345
+ fruits-vegetables-legumes_100g : 232979
 
 
 
 
 ## 5. Produits par rayon après nettoyage
  ### Produits par rayon :  
-  alcoholic-beverages : 8362
+  alcoholic-beverages : 8357
 
  baby-foods-and-milks : 2451
 
- beverages : 44288
+ beverages : 44357
 
- cereals-and-potatoes : 54291
+ cereals-and-potatoes : 54106
 
- composite-foods : 37435
+ composite-foods : 37119
 
- fats-and-sauces : 36136
+ fats-and-sauces : 36134
 
- fish-meat-eggs : 84335
+ fish-meat-eggs : 84393
 
- fruits-and-vegetables : 34419
+ fruits-and-vegetables : 35582
 
- milk-and-dairy-products : 57899
+ milk-and-dairy-products : 57971
 
- salty-snacks : 28742
+ salty-snacks : 28188
 
- sugary-snacks : 105501
+ sugary-snacks : 105689
 
- unknown : 55054
+ unknown : 55137
 
 
 
