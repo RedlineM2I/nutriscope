@@ -221,3 +221,5 @@ src/drafts
 docs/data/registre_hypotheses.csv
 notebooks/figures
 docs/annexes/data/echantillon_france.csv
+
+notebooks/*.parquet
