@@ -156,7 +156,7 @@ def main():
     else:
         title2("Récapitulatif")
         for r in reports:
-            print(f"✔ {r.step:<14} {r.duration:8.1f} s {r.rows:>10} lignes  {', '.join(r.files)}")
+            print(f"✔ {r.step:<14} {r.duration:8.1f} s {r.rows:>10} lignes  {', '.join([str(x) for x in r.files])}")
         print(f"Journal des durées : {PIPELINE_LOG}")
 
     # export_to_parquet()
