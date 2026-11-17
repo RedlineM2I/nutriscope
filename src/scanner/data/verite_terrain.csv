@@ -1,0 +1,23 @@
+id,code,nom,marque,base,kj,kcal,lipides,satures,glucides,sucres,fibres,proteines,sel,inferieur_a,code_barres_sur_photo,particularite,ecarts_catalogue_off
+01,3017620422003,Nutella,Ferrero,100 g,2252,539,30.9,10.6,57.5,56.3,,6.3,0.107,,,tableau trilingue (FR/NL/DE) avec colonne par portion,fibres : absentes de l'étiquette mais 0 dans Open Food Facts
+02,7622210449283,Prince goût chocolat au blé complet,LU,100 g,1962,467,17,5.6,69,32,4.0,6.3,0.49,,,photo prise de biais sur un emballage cylindrique,
+03,3329770077003,Skyr nature 0 %,Yoplait,100 g,241,57,0.5,0.1,3.6,3.6,,9.5,0.14,lipides;satures,,valeurs en texte continu trilingue (pas de tableau) ; mentions « < 0.5 g » et « < 0.1 g »,fibres : absentes de l'étiquette mais 0 dans Open Food Facts
+04,3168930010265,Cruesli mélange de noix,Quaker,100 g,1913,462,19,2.0,57,12,10,8.5,0,,,tableau suivi d'un second tableau vitamines/minéraux,
+05,3046920022651,Excellence Noir Intense 70 % cacao,Lindt,100 g,2350,566,41,24,35,30,,9.5,0.02,,,tableau net sans ligne fibres,fibres : absentes de l'étiquette mais 12.2 dans Open Food Facts
+06,3175680011480,Sésame,Gerblé,100 g,1961,467,18,2.0,64,17,4.6,10,0.38,,,tableau coupé en deux blocs côte à côte (le sel est dans le bloc de droite),
+07,3228857002344,American Sandwich Complet sans sucres ajoutés,Harrys,100 g,1178,280,6.8,0.5,43,3.6,8.1,7.7,1.1,,,colonnes 100 g / tranche de 42.9 g / % AR,
+08,5411188112709,Amande grillée sans sucres,Alpro,100 ml,61,15,1.2,0.1,0,0,0.3,0.5,0.15,,,boisson : valeurs pour 100 ml ; pli de l'emballage au milieu du tableau,lipides : 1.2 sur l'étiquette contre 1.1 dans Open Food Facts
+09,3168930163480,Gazpacho l'Original,Alvalle,100 ml,168,40,2.2,0.4,3.5,3.3,1.2,0.9,0.62,,,boisson : valeurs pour 100 ml ; petit tableau au bas d'une photo de la brique entière tenue à la main ; liste d'ingrédients lisible,sel : 0.62 sur l'étiquette contre 0.67 dans Open Food Facts
+10,3608580065340,Pâte à tartiner noisettes et cacao,Bonne Maman,100 g,2299,551,34,5.2,53,51,3.3,6.7,0.10,,,tableau net,
+11,5449000214911,Coca-Cola Original,Coca-Cola,100 ml,180,42,0,0,10.6,10.6,,0,0,,,boisson : valeurs pour 100 ml ; canette courbe et ombre portée ; colonne 330 ml juste à côté,
+12,3292070005161,Houmous extra,L'atelier Blini,100 g,1309,317,26.8,2.6,8.7,0.1,6.15,6.9,1.16,,,valeurs en texte continu sur trois lignes (pas de tableau) ; marque Labeyrie dans Open Food Facts,
+13,3387390123210,Chocapic,Nestlé,100 g,1624,384,4.4,1.1,73.8,19.9,7.7,8.5,0.20,,,tableau suivi d'un second tableau vitamines/minéraux,
+14,3302740087059,Les tranches végé Lentilles Corail,Fleury Michon,100 g,596,143,6.5,0.6,11,0.5,3.8,8.1,1.8,sucres,,photo de petite taille (294 × 430 px) ; mention « < 0.5 g »,
+15,5053990156009,Pringles Original,Pringles,100 g,2203,528,31,3.0,54,0.9,4.1,6.2,1.0,,,libellés en quatre langues ; points décimaux,
+16,3154230810131,Le Bon Paris -25 % de sel,Herta,100 g,476,113,2.4,1.0,0.8,0.5,0.5,22,1.4,sucres;fibres,etiquette,tableau horizontal sur une ligne ; code-barres lisible sur la même photo,sucres et fibres : « < 0.5 g » sur l'étiquette contre 0 dans Open Food Facts ; sel : 1.4 contre 1.375
+17,3240931548111,Gnocchi à poêler,Lustucru,100 g,801,190,2.7,0.3,35,1.5,2.6,5,1.1,,,photo de très petite taille (288 × 218 px),
+18,3083680973939,Ratatouille cuisinée à la provençale,Cassegrain,100 g,346,83,5.1,1.1,5.9,5.7,3.9,1.5,0.58,,,tableau net (texte clair sur fond sombre),toutes les valeurs diffèrent (recette modifiée) : Open Food Facts donne 72 kcal - 4.1 - 0.6 - 5.5 - 3.4 - 1.3 - 0.81
+19,87157215,Tomato Ketchup,Heinz,100 g,435,102,0.1,0.1,23.2,22.8,,1.2,1.8,satures,,photo de très petite taille (276 × 267 px) ; pas de ligne fibres,
+20,8076809513753,Pesto alla Genovese,Barilla,100 g,1989,482,46,7.1,9.8,5.5,5.0,4.7,3.25,,,tableau bilingue (FR/NL) ; unités à gauche des valeurs,valeurs différentes (recette modifiée) : Open Food Facts donne 492 kcal - 47 - 5.3 - 5 - 3 - 4.7 - 3.2
+21,3178530410105,Petites Madeleines,St Michel,,,,,,,,,,,,etiquette,la photo « tableau nutritionnel » ne montre aucun tableau : seulement le code-barres et une date ; aucune valeur ne doit être lue,
+22,3083681148619,Carottes râpées citron de Sicile,Bonduelle,100 g,301,73,4.5,0.3,5.5,4.5,3.0,1.0,0.71,,,tableau net,
