@@ -1,4 +1,9 @@
-"""Chemins du projet et constantes métier."""
+"""Chemins du projet et constantes métier.
+
+Les chemins datés (`..._{TODAY}`) servent à l'écriture des sorties du jour. Pour
+lire l'entrée d'une étape, passer par `src.outputs` (`latest_raw`, `latest_clean`,
+`latest_partitioned`), qui retombe sur la sortie la plus récente.
+"""
 
 from enum import StrEnum
 from pathlib import Path
@@ -48,6 +53,12 @@ EXPORT_CLEANING_REPORT = BASE_DIR.parent / "docs" / "data" / "rapport_nettoyage.
 
 
 class Tag(StrEnum):
+    """Champs à tags multiples mis à plat en tables de liaison.
+
+    La valeur (au singulier) sert à nommer les colonnes d'identifiant
+    (`category_id`...) ; `plural` donne le nom des tables et des colonnes
+    sources (`categories_tags`...).
+    """
     CATEGORY = "category"
     ORIGIN = "origin"
     LABEL = "label"
@@ -58,7 +69,7 @@ class Tag(StrEnum):
 
     @property
     def plural(self) -> str:
-        """Nom des tables et des colonnes de tags : categories, origins..."""
+        """Renvoie le pluriel du tag, pour nommer tables et colonnes : categories, origins..."""
 
         if self is Tag.CATEGORY:
             return "categories"

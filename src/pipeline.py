@@ -1,9 +1,9 @@
-"""
-Étapes du projet, appelées par main.py et par les tâches du DAG Airflow.
+"""Étapes du pipeline NutriScope, appelées par `main` et par les tâches du DAG Airflow.
 
+Point d'entrée : `python -m src.pipeline --<étape>` (ou `--all`).
 Chaque étape lit et écrit des fichiers (parquet) ou la base PostgreSQL : elle peut
-donc tourner seule, dans son propre processus. Seules flatten_to_relational et
-load_database partagent une connexion DuckDB (tables temporaires en mémoire) :
+donc tourner seule, dans son propre processus. Seules `flatten_to_relational` et
+`load_database` partagent une connexion DuckDB (tables temporaires en mémoire) :
 elles doivent être appelées l'une après l'autre dans le même processus.
 """
 
@@ -45,7 +45,14 @@ JUNCTION_TABLES = [
 ]
 
 def parse_args() -> argparse.Namespace:
-    """Lit les options de la ligne de commande (une seule action à la fois)."""
+    """Lit les options de la ligne de commande.
+
+    Les options d'étape sont mutuellement exclusives (une seule action à la fois) ;
+    `--force` peut s'y ajouter.
+
+    Returns:
+        Options lues (un booléen par étape, plus `all` et `force`).
+    """
     parser = argparse.ArgumentParser(description="Traite des fichiers Parquet.")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--download", action="store_true", help="Download the parquet file from the huggingface repository")
@@ -72,11 +79,16 @@ CLEANING_RULES = [
 ]
 
 def step_download(force: bool = False) -> StepReport:
-    """
-    Fige le brut du jour (périmètre France) et son manifeste ; lignes = produits du périmètre.
+    """Fige le brut du jour (périmètre France) et son manifeste.
 
-    La source est le parquet désigné par NUTRISCOPE_SOURCE, sinon le parquet Open Food Facts,
-    téléchargé seulement s'il est absent (ou avec --force).
+    La source est le parquet désigné par `NUTRISCOPE_SOURCE`, sinon le parquet Open Food Facts,
+    téléchargé seulement s'il est absent (ou avec `--force`).
+
+    Args:
+        force: retélécharge le parquet Open Food Facts même s'il est déjà présent.
+
+    Returns:
+        Rapport de l'étape ; lignes = produits du périmètre.
     """
     start = time.perf_counter()
     source = source_override()
@@ -92,7 +104,14 @@ def step_download(force: bool = False) -> StepReport:
     return StepReport("download", time.perf_counter() - start, rows, [str(source), PARQUET_FR, RAW_MANIFEST])
 
 def step_clean(force: bool = False) -> StepReport:
-    """Nettoie le périmètre France ; lignes = produits conservés après la dernière règle."""
+    """Nettoie le brut le plus récent (périmètre France).
+
+    Args:
+        force: inutilisé (signature commune à toutes les étapes).
+
+    Returns:
+        Rapport de l'étape ; lignes = produits conservés après la dernière règle.
+    """
     title2("Nettoyage des données")
     start = time.perf_counter()
     conn_duckdb = connect()
@@ -101,7 +120,14 @@ def step_clean(force: bool = False) -> StepReport:
     return StepReport("clean", time.perf_counter() - start, rows, [PARQUET_CLEAN_DATASET, str(EXPORT_CLEANING_REPORT)])
 
 def step_load_database(force: bool = False) -> StepReport:
-    """Recrée et remplit la base ; lignes = produits de la table products, autant que dans le nettoyé."""
+    """Recrée et remplit la base PostgreSQL à partir du nettoyé le plus récent.
+
+    Args:
+        force: inutilisé (signature commune à toutes les étapes).
+
+    Returns:
+        Rapport de l'étape ; lignes = produits de la table products, autant que dans le nettoyé.
+    """
     start = time.perf_counter()
     clean_file = latest_clean()
     reset_database()
@@ -113,7 +139,16 @@ def step_load_database(force: bool = False) -> StepReport:
     return StepReport("load_database", time.perf_counter() - start, rows)
 
 def step_extract_parquet(force: bool = False) -> StepReport:
-    """Partitionne le nettoyé le plus récent par food_group (dossier du jour + _SUCCESS)."""
+    """Partitionne le nettoyé le plus récent par food_group (dossier du jour + `_SUCCESS`).
+
+    Écrit aussi le schéma JSON du dataset partitionné.
+
+    Args:
+        force: inutilisé (signature commune à toutes les étapes).
+
+    Returns:
+        Rapport de l'étape ; lignes = produits relus, autant que dans le nettoyé.
+    """
     start = time.perf_counter()
     clean_file = latest_clean()
     rows = convert_parquet(clean_file, Path(PARQUET_CLEAN_BY_FOOD_GROUP))
@@ -122,7 +157,17 @@ def step_extract_parquet(force: bool = False) -> StepReport:
     return StepReport("extract_parquet", time.perf_counter() - start, rows, [PARQUET_CLEAN_BY_FOOD_GROUP, SCHEMA_PRODUIT_JSON])
 
 def step_build_dataset(force: bool = False) -> StepReport:
-    """Écrit l'export ML figé (split train/test) ; refuse d'écraser celui du jour sans --force."""
+    """Écrit l'export ML figé (split train/test) et son `schema.json`.
+
+    Args:
+        force: réécrit l'export du jour s'il existe déjà.
+
+    Returns:
+        Rapport de l'étape ; lignes = produits de l'export.
+
+    Raises:
+        FileExistsError: l'export du jour existe déjà et `force` est faux.
+    """
     start = time.perf_counter()
     path = write_parquet(force=force)
     rows = build_schema(path)
@@ -141,6 +186,12 @@ STEPS = {
 
 @timer
 def main():
+    """Lance les étapes demandées puis affiche leur récapitulatif.
+
+    Les étapes s'exécutent dans l'ordre de `STEPS` (toutes avec `--all`). Une entrée
+    manquante ou un export figé déjà présent arrête le programme avec un message
+    clair (code de sortie 1) au lieu d'une trace Python.
+    """
     args = parse_args()
     title1("Projet Nutriscope")
 
@@ -164,14 +215,23 @@ def main():
 
 @timer(label="Téléchargement du fichier parquet")
 def download() -> None:
-    """Télécharge le parquet complet d'OpenFoodFacts."""
+    """Télécharge le parquet complet d'Open Food Facts."""
     title2("Téléchargement du fichier parquet OpenFactFood")
     fetch_data.download()
 
 
 @timer(label="Filtre sur le périmètre")
 def filter_country(source: Path, dest: Path, country: str = "en:france") -> int:
-    """Restreint le parquet aux colonnes utiles et aux produits vendus dans le pays. Retourne le nombre de produits."""
+    """Restreint le parquet aux colonnes utiles et aux produits vendus dans le pays.
+
+    Args:
+        source: parquet Open Food Facts à filtrer.
+        dest: parquet filtré à écrire.
+        country: tag du pays à conserver.
+
+    Returns:
+        Nombre de produits du périmètre.
+    """
     title2("Filtre sur le périmètre du fichier parquet (colonnes sélectionnées et produits en France)")
     rows = get_products_from(source, dest, country)
     print(f"✔ {source.name} → {dest.name}")
@@ -180,7 +240,17 @@ def filter_country(source: Path, dest: Path, country: str = "en:france") -> int:
 
 @timer(label="Nettoyage")
 def clean(products) -> int:
-    """Applique les règles de nettoyage et exporte le résultat en parquet. Retourne le nombre de lignes finales."""
+    """Applique les règles de nettoyage et exporte le résultat en parquet.
+
+    Les règles s'appliquent dans l'ordre de `CLEANING_RULES` ; leurs rapports
+    alimentent le rapport Markdown de nettoyage.
+
+    Args:
+        products: DataFrame des produits du périmètre.
+
+    Returns:
+        Nombre de lignes après la dernière règle.
+    """
     # title2("Nettoyage des données")
     before = products.copy()
     reports = []
@@ -208,7 +278,12 @@ def reset_database() -> None:
 
 @timer(label="Conversion en tables relationnelles")
 def flatten_to_relational(conn_duckdb: DuckDBPyConnection, clean_file: Path) -> None:
-    """Découpe le parquet nettoyé en tables temporaires DuckDB, au format du schéma PostgreSQL."""
+    """Découpe le parquet nettoyé en tables temporaires DuckDB, au format du schéma PostgreSQL.
+
+    Args:
+        conn_duckdb: connexion DuckDB, à réutiliser ensuite pour `load_database`.
+        clean_file: parquet nettoyé à découper.
+    """
     title2("Conversion du fichier parquet en tables relationnelles")
     flat_to_rel = FlatToRelational(conn=conn_duckdb, source=clean_file)
 
@@ -221,13 +296,25 @@ def flatten_to_relational(conn_duckdb: DuckDBPyConnection, clean_file: Path) -> 
 
 @timer(label="Chargement des tables")
 def load_database(conn_duckdb: DuckDBPyConnection) -> int:
-    """Charge dans PostgreSQL les tables temporaires créées par flatten_to_relational. Retourne le total de lignes insérées."""
+    """Charge dans PostgreSQL les tables temporaires créées par `flatten_to_relational`.
+
+    Les contraintes des tables de liaison sont retirées avant le chargement (COPY plus
+    rapide) puis restaurées après. Les référentiels sont insérés avant les tables qui
+    les référencent.
+
+    Args:
+        conn_duckdb: connexion DuckDB qui contient les tables temporaires.
+
+    Returns:
+        Total de lignes insérées, toutes tables confondues.
+    """
     title2("Chargement des tables dans la base de données")
     rel_reader = RelationalReader(conn_duckdb)
     engine = get_engine()
     total = 0
 
     def insert(df, table):
+        """Ajoute `df` à la table PostgreSQL `table` par COPY et met à jour le total."""
         nonlocal total
         df.to_sql(table, con=conn_psql, if_exists="append", index=False, method=psql_insert_copy)
         total += len(df)
@@ -273,13 +360,20 @@ def load_database(conn_duckdb: DuckDBPyConnection) -> int:
 
 
 def count_products_in_database() -> int:
-    """Nombre de produits dans la table PostgreSQL products."""
+    """Renvoie le nombre de produits de la table PostgreSQL products."""
     with get_engine().connect() as conn_psql:
         return conn_psql.execute(text("SELECT count(*) FROM products")).scalar_one()
 
 
 def export_to_parquet(schema: str = "public") -> None:
-    """Exporte chaque table PostgreSQL du schéma dans un fichier parquet."""
+    """Exporte chaque table PostgreSQL du schéma dans un fichier parquet.
+
+    DuckDB se connecte à PostgreSQL en lecture seule (extension postgres) et écrit
+    un parquet compressé ZSTD par table dans `EXPORT_PARQUET_DIR`.
+
+    Args:
+        schema: schéma PostgreSQL dont on exporte les tables.
+    """
     title2("Exportation des tables vers des fichiers parquets")
     EXPORT_PARQUET_DIR.mkdir(parents=True, exist_ok=True)
 

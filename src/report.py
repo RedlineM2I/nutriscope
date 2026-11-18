@@ -1,4 +1,9 @@
-"""Génération du rapport de nettoyage NutriScope (TP 9)."""
+"""Génération du rapport de nettoyage NutriScope (TP 9).
+
+Le rapport Markdown (`docs/data/rapport_nettoyage.md`) compare les données avant
+et après nettoyage : volumétrie, règles appliquées, anomalies, manquants, produits
+par rayon et colonnes ajoutées ou retirées.
+"""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -21,10 +26,17 @@ MACRO_COLUMNS = ["fat_100g", "carbohydrates_100g", "proteins_100g"]
 
 @dataclass
 class MarkdownSubSection:
+    """Section Markdown de niveau 2 composée de sous-sections de niveau 3.
+
+    Attributes:
+        title: titre de la section (`## ...`).
+        content: sous-sections, titre (`### ...`) -> texte.
+    """
     title: str
     content: dict[str, str]
 
     def __str__(self) -> str:
+        """Renvoie la section au format Markdown."""
         result = f"## {self.title}"
         for name, values in self.content.items():
             result = result + f"\n ### {name} \n {values}"
@@ -32,6 +44,10 @@ class MarkdownSubSection:
 
 
 def _dict_to_string(data: Dict[str, str]) -> str:
+    """Renvoie une ligne `nom : valeur` par élément, séparées par une ligne vide.
+
+    Accepte aussi une Series pandas (même interface `items()`).
+    """
     result = ""
     for name, item in data.items():
         result = result + f" {name} : {item}\n\n"
@@ -39,6 +55,7 @@ def _dict_to_string(data: Dict[str, str]) -> str:
 
 
 def _dict_to_markdown_table(data: Dict[str, str]) -> str:
+    """Renvoie un tableau Markdown d'une ligne : les clés en en-tête, les valeurs dessous."""
     result = f"\n\n | {' | '.join([str(name) for name in data.keys()])} |\n"
     result = result + "|---" * len(data) + "|\n"
     result = result + f"| {' | '.join([str(value) for value in data.values()])} |\n"
@@ -46,6 +63,7 @@ def _dict_to_markdown_table(data: Dict[str, str]) -> str:
 
 
 def _anomalies(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    """Construit la section 3 : anomalies métier avant et après nettoyage."""
     before_values = _anomalies_list(before)
     after_values = _anomalies_list(after)
 
@@ -59,6 +77,18 @@ def _anomalies(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
 
 
 def _anomalies_list(df: pd.DataFrame) -> str:
+    """Compte les valeurs impossibles d'un DataFrame et les met en texte.
+
+    Contrôles : sucres, matières grasses, sel ou protéines > 100 g, énergie
+    > 3 800 kJ, somme des macronutriments > 100 g, et valeurs négatives par
+    nutriment (en tableau).
+
+    Args:
+        df: données à contrôler (colonnes nutritionnelles pour 100 g).
+
+    Returns:
+        Une ligne `anomalie : nombre de produits` par contrôle.
+    """
     anomalies = {
         "Sucres > 100 g ": (df["sugars_100g"] > 100).sum(),
         "Matières grasses > 100 g ": (df["fat_100g"] > 100).sum(),
@@ -79,6 +109,7 @@ def _anomalies_list(df: pd.DataFrame) -> str:
 
 
 def _volumetry(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    """Construit la section 1 : nombre de lignes avant et après nettoyage."""
     return MarkdownSubSection(
         "1. Volumétrie",
         {
@@ -89,6 +120,7 @@ def _volumetry(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
 
 
 def _rules(reports: List[Report]) -> MarkdownSubSection:
+    """Construit la section 2 : tableau des règles de nettoyage, une ligne par rapport."""
     result = MarkdownSubSection("2. Rapport de nettoyage", {})
 
     result.content["Tableau des rapports : "] = (
@@ -107,6 +139,7 @@ def _rules(reports: List[Report]) -> MarkdownSubSection:
 
 
 def _missing(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    """Construit la section 4 : valeurs manquantes des nutriments clés, avant et après."""
     return MarkdownSubSection(
         "4. Manquants",
         {
@@ -121,6 +154,7 @@ def _missing(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
 
 
 def _products_by_food_group(after: pd.DataFrame) -> MarkdownSubSection:
+    """Construit la section 5 : nombre de produits par rayon (`food_group`) après nettoyage."""
     result = _dict_to_string(
         after.groupby("food_group")["food_group"].count()
     )
@@ -134,6 +168,7 @@ def _products_by_food_group(after: pd.DataFrame) -> MarkdownSubSection:
 
 
 def _columns(before: pd.DataFrame, after: pd.DataFrame) -> MarkdownSubSection:
+    """Construit la section 6 : colonnes ajoutées et retirées par le nettoyage."""
     added_columns = sorted(set(after.columns) - set(before.columns))
     removed_columns = sorted(set(before.columns) - set(after.columns))
 
@@ -164,9 +199,10 @@ def generate_report(
     Args:
         before: données avant nettoyage.
         after: données après nettoyage.
-        reports: comptes rendus des règles appliquées, dans l'ordre. Chaque
-            élément expose `name` (str), `rows_touched` (int) et
-            `details` (dict sous-règle -> nombre de lignes).
+        reports: comptes rendus (`Report`) des règles appliquées, dans l'ordre.
+            Chaque élément expose `rule` (str), `lines_before`, `lines_after`,
+            `affected_lines` (int) et `details` (dict sous-règle -> nombre de
+            lignes).
         output_path: fichier de sortie, par exemple
             `docs/data/rapport_nettoyage.md`.
     """

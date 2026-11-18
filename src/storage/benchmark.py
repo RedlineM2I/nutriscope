@@ -30,10 +30,13 @@ Rows = list[Sequence]
 
 
 def peak_memory_mb() -> float:
-    """Retourne le pic de mémoire (RSS) du processus courant, en Mo.
+    """Renvoie le pic de mémoire (RSS) du processus courant, en Mo.
 
     L'unité de `ru_maxrss` dépend de l'OS (octets sous macOS, Ko sous Linux) ;
     sous Windows, on passe par psutil car `resource` n'existe pas.
+
+    Returns:
+        Pic de mémoire du processus, en Mo.
     """
     if sys.platform == "win32":
         import psutil
@@ -44,9 +47,15 @@ def peak_memory_mb() -> float:
 
 
 def run_postgres(sql: str) -> Rows:
-    """Exécute une requête SQL sur PostgreSQL et retourne les lignes en tuples.
+    """Exécute une requête SQL sur PostgreSQL et renvoie les lignes en tuples.
 
     Les imports sont locaux pour ne pas gonfler la mémoire mesurée des autres moteurs.
+
+    Args:
+        sql: requête SQL à exécuter.
+
+    Returns:
+        Lignes du résultat, une par tuple.
     """
     from sqlalchemy import text
     from src.db_psql.connection import get_engine
@@ -57,7 +66,7 @@ def run_postgres(sql: str) -> Rows:
 
 # ---------- Requête 1 : agrégat par rayon ----------
 def pandas_aggregate() -> Rows:
-    """Moyenne des sucres et du sel par rayon, avec pandas sur le Parquet complet."""
+    """Calcule la moyenne des sucres et du sel par rayon, avec pandas sur le Parquet complet."""
     import pandas as pd
 
     df = pd.read_parquet(
@@ -74,7 +83,7 @@ def pandas_aggregate() -> Rows:
 
 
 def duckdb_aggregate() -> Rows:
-    """Même agrégat avec DuckDB sur le Parquet partitionné."""
+    """Calcule le même agrégat avec DuckDB sur le Parquet partitionné."""
     import duckdb
 
     return duckdb.sql(f"""
@@ -84,7 +93,7 @@ def duckdb_aggregate() -> Rows:
 
 
 def postgres_aggregate() -> Rows:
-    """Même agrégat sur la base PostgreSQL (jointures produits/rayons/nutriments)."""
+    """Calcule le même agrégat sur la base PostgreSQL (jointures produits/rayons/nutriments)."""
     return run_postgres("""
         SELECT f.name, count(*) n, avg(nv.sugars_100g), avg(nv.salt_100g)
         FROM products p
@@ -95,7 +104,7 @@ def postgres_aggregate() -> Rows:
 
 # ---------- Requête 2 : filtre et tri ----------
 def pandas_filter() -> Rows:
-    """Les TOP_N produits les plus sucrés du rayon FOOD_GROUP, avec pandas."""
+    """Renvoie les `TOP_N` produits les plus sucrés du rayon `FOOD_GROUP`, avec pandas."""
     import pandas as pd
 
     df = pd.read_parquet(
@@ -111,7 +120,7 @@ def pandas_filter() -> Rows:
 
 
 def duckdb_filter() -> Rows:
-    """Les TOP_N produits les plus sucrés du rayon FOOD_GROUP, avec DuckDB."""
+    """Renvoie les `TOP_N` produits les plus sucrés du rayon `FOOD_GROUP`, avec DuckDB."""
     import duckdb
 
     return duckdb.sql(f"""
@@ -122,7 +131,7 @@ def duckdb_filter() -> Rows:
 
 
 def postgres_filter() -> Rows:
-    """Les TOP_N produits les plus sucrés du rayon FOOD_GROUP, avec PostgreSQL."""
+    """Renvoie les `TOP_N` produits les plus sucrés du rayon `FOOD_GROUP`, avec PostgreSQL."""
     return run_postgres(f"""
         SELECT p.code, nv.sugars_100g
         FROM products p
@@ -135,7 +144,7 @@ GRADES_SQL = "('a', 'b', 'c', 'd', 'e')"
 
 # ---------- Requête 3 : agrégat à forte cardinalité ----------
 def pandas_brand_completeness() -> Rows:
-    """Top TOP_N des marques par nombre de produits, avec % de Nutri-Score a-e (pandas)."""
+    """Renvoie les `TOP_N` marques qui ont le plus de produits, avec leur % de Nutri-Score a-e (pandas)."""
     import pandas as pd
 
     df = pd.read_parquet(PARQUET_CLEAN_DATASET, columns=["brands_tags", "nutriscore_grade"])
@@ -155,7 +164,7 @@ def pandas_brand_completeness() -> Rows:
 
 
 def duckdb_brand_completeness() -> Rows:
-    """Même agrégat avec DuckDB sur le Parquet partitionné (colonne `brand`)."""
+    """Calcule le même agrégat avec DuckDB sur le Parquet partitionné (colonne `brand`)."""
     import duckdb
 
     return duckdb.sql(f"""
@@ -167,7 +176,7 @@ def duckdb_brand_completeness() -> Rows:
 
 
 def postgres_brand_completeness() -> Rows:
-    """Même agrégat sur PostgreSQL (jointure produits/marques)."""
+    """Calcule le même agrégat sur PostgreSQL (jointure produits/marques)."""
     return run_postgres(f"""
         SELECT b.name, count(*) n,
                round(100.0 * count(*) FILTER (WHERE p.nutriscore_grade IN {GRADES_SQL}) / count(*), 2)
@@ -177,7 +186,11 @@ def postgres_brand_completeness() -> Rows:
         GROUP BY b.name ORDER BY n DESC, b.name LIMIT {TOP_N}""")
 
 def baseline() -> Rows:
-    """Mesure de référence : poids de l'interpréteur et des imports seuls."""
+    """Sert de mesure de référence : poids de l'interpréteur et des imports seuls.
+
+    Returns:
+        Liste vide (aucune requête exécutée).
+    """
     import duckdb, pandas, psycopg2  # noqa: F401
     return []
 
@@ -197,7 +210,15 @@ RUNNERS: dict[tuple[str, str], Callable[[], Rows]] = {
 
 
 def run_single(engine: str, query: str) -> None:
-    """Exécute une mesure et affiche le résultat en JSON sur la sortie standard."""
+    """Exécute une mesure et affiche le résultat en JSON sur la sortie standard.
+
+    Le JSON contient le temps écoulé, le pic mémoire, le nombre de lignes et les
+    trois premières lignes du résultat.
+
+    Args:
+        engine: moteur mesuré (clé de `RUNNERS`, ex. « duckdb_parquet »).
+        query: requête mesurée (clé de `RUNNERS`, ex. « aggregate »).
+    """
     start = time.perf_counter()
     rows = RUNNERS[(engine, query)]()
     elapsed = time.perf_counter() - start
@@ -210,7 +231,19 @@ def run_single(engine: str, query: str) -> None:
 
 
 def measure(engine: str, query: str, repetitions: int = REPETITIONS) -> dict:
-    """Lance `repetitions` sous-processus neufs ; retourne la médiane des temps et le pic mémoire max."""
+    """Lance `repetitions` sous-processus neufs et agrège leurs mesures.
+
+    Args:
+        engine: moteur mesuré (clé de `RUNNERS`).
+        query: requête mesurée (clé de `RUNNERS`).
+        repetitions: nombre de sous-processus lancés.
+
+    Returns:
+        Médiane des temps, pic mémoire maximal, nombre de lignes et premières lignes.
+
+    Raises:
+        RuntimeError: un sous-processus a échoué.
+    """
     results = []
     for _ in range(repetitions):
         proc = subprocess.run(
@@ -229,7 +262,14 @@ def measure(engine: str, query: str, repetitions: int = REPETITIONS) -> dict:
 
 
 def write_report(measures: dict[str, dict]) -> None:
-    """Écrit le tableau des mesures au format Markdown dans REPORT_PATH."""
+    """Construit le tableau des mesures au format Markdown et l'affiche.
+
+    L'écriture dans `REPORT_PATH` est actuellement commentée : le tableau est
+    seulement affiché sur la sortie standard.
+
+    Args:
+        measures: mesures par « moteur/requête », telles que renvoyées par `measure`.
+    """
     lines = [
         "# Benchmark", "",
         "Données : © Open Food Facts contributors, ODbL", "",

@@ -1,12 +1,19 @@
+"""Extraction des nutriments (principaux et secondaires) depuis la table DuckDB `products`."""
 from duckdb import DuckDBPyConnection
 from pandas import DataFrame
 
 
 def get_nutriments(conn_duckdb: DuckDBPyConnection) -> DataFrame:
-    """
-    Extrait les nutriments de la base DuckDB
-    :param conn_duckdb: Connexion à la base DuckDB
-    :return: Dataframe des nutriments principaux
+    """Extrait les nutriments principaux de la table DuckDB `products`.
+
+    Les noms de colonnes avec tiret sont renommés avec des tirets bas, pour
+    PostgreSQL (ex. `energy-kcal_100g` -> `energy_kcal_100g`).
+
+    Args:
+        conn_duckdb: connexion à la base DuckDB.
+
+    Returns:
+        DataFrame des nutriments principaux, une ligne par produit.
     """
     return conn_duckdb.sql("""
            SELECT id as product_id,
@@ -25,10 +32,17 @@ def get_nutriments(conn_duckdb: DuckDBPyConnection) -> DataFrame:
            """).df()
 
 def get_secondary_nutrients(conn_duckdb: DuckDBPyConnection) -> DataFrame :
-    """
-    Extrait les nutriments secondaires de la base DuckDB
-    :param conn_duckdb: Connexion à la base DuckDB
-    :return: Dataframe des nutriments secondaires
+    """Extrait les nutriments secondaires de la table DuckDB `products`.
+
+    La liste `nutriments_secondaires` est dépliée (une ligne par produit et
+    nutriment) ; les nutriments sans valeur pour 100 g sont écartés.
+
+    Args:
+        conn_duckdb: connexion à la base DuckDB.
+
+    Returns:
+        DataFrame des nutriments secondaires (`product_id`, `name`,
+        `value_100g`, `unit`).
     """
     return conn_duckdb.sql("""
         SELECT id               as product_id,
@@ -42,10 +56,15 @@ def get_secondary_nutrients(conn_duckdb: DuckDBPyConnection) -> DataFrame :
 
 
 def get_secondary_nutrients_link_table(conn_duckdb: DuckDBPyConnection) -> tuple[DataFrame, DataFrame]:
-    """
-    Crée la table des nutriments secondaires et sa table de liaison
-    :param conn_duckdb: Connexion à la base DuckDB
-    :return: DataFrame des nutriments secondaire et DataFrame de la table de liaison
+    """Crée la table des nutriments secondaires et sa table de liaison.
+
+    Args:
+        conn_duckdb: connexion à la base DuckDB.
+
+    Returns:
+        Le DataFrame des nutriments secondaires (`id`, `name`, `unit`) et le
+        DataFrame de la table de liaison (`product_id`, `nutrient_id`,
+        `value_100g`).
     """
     df_secondary_nutrients = get_secondary_nutrients(conn_duckdb)
     id_nm_unit = df_secondary_nutrients[["name", "unit"]].drop_duplicates(subset="name").reset_index(

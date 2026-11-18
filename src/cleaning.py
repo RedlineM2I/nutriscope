@@ -1,3 +1,9 @@
+"""Règles de nettoyage des produits Open Food Facts.
+
+Chaque règle publique a la forme `df -> (df, Report)` : elle travaille sur une copie
+du DataFrame (l'entrée n'est jamais modifiée) et renvoie un compte rendu de ce qu'elle a changé.
+L'ordre d'application est imposé par `CLEANING_RULES` dans `src/pipeline.py`.
+"""
 import re
 import unicodedata
 from typing import Dict, Tuple
@@ -30,10 +36,19 @@ LANGUAGE_PREFIX = re.compile(r"^[a-z]{2}:")  # 'fr:', 'en:'...
 
 
 def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    """Règle de normalisation des unités :
+    """Normalise les unités d'énergie et le couple sel / sodium.
+
     - Convertit les kJ en kcal si ces derniers sont absents (kcal = kJ / 4,184) ou si le rapport kJ / kcal
-      sort de l'intervalle [3,9 ; 4,5]
-    - Calcule le sel ou le sodium si l'un est manquant (sel = sodium x 2,5), et recalcule le sodium depuis le sel s'il est incohérent"""
+      sort de l'intervalle [3,9 ; 4,5].
+    - Calcule le sel ou le sodium si l'un est manquant (sel = sodium x 2,5), et recalcule le sodium
+      depuis le sel s'il est incohérent.
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
+    """
 
     # Copie de df
     res = df.copy()
@@ -51,7 +66,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     kcal_derived_mask = kcal.isna() & kj.notna()
     kcal.loc[kcal_derived_mask] = (kj.loc[kcal_derived_mask] / KJ_PER_KCAL).round(3)
 
-    # Recalculate de kcal si ratio kJ/kcal hors de l'interval [3.9 ; 4.5].
+    # Recalcul des kcal si le ratio kJ/kcal est hors de l'intervalle [3,9 ; 4,5].
     ratio_kj_kcal = kj / kcal
     kcal_recomputed_mask = (
             kj.notna() & kcal.notna() & (kcal >= 1)
@@ -66,7 +81,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
     sodium_derived_mask = sodium.isna() & sel.notna()
     sodium.loc[sodium_derived_mask] = (sel.loc[sodium_derived_mask] / SALT_PER_SODIUM).round(4)
 
-    # Sodium recalculé depuis le sel si incoherent.
+    # Sodium recalculé depuis le sel s'il est incohérent.
     sodium_recomputed_mask = (
             sodium.notna() & sel.notna() & ~sodium_derived_mask & ((sel - sodium * SALT_PER_SODIUM).abs() > 1e-3)
     )
@@ -97,6 +112,7 @@ def normalize_units(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
 
 def _is_list(value) -> bool:
+    """Indique si la valeur est une liste Python ou un tableau numpy."""
     return isinstance(value, (list, np.ndarray))
 
 
@@ -113,6 +129,7 @@ def _differs(before, after) -> bool:
 
 
 def _changed_mask(before: pd.Series, after: pd.Series) -> pd.Series:
+    """Renvoie un masque booléen des lignes dont la valeur a changé entre `before` et `after`."""
     return pd.Series([_differs(b, a) for b, a in zip(before, after)], index=before.index, dtype=bool)
 
 
@@ -123,7 +140,10 @@ def _as_mask(series: pd.Series) -> pd.Series:
 
 def _clean_tags(tags):
     """Retire le préfixe de langue, passe en minuscules, écarte les tags vides et les doublons.
-    Une liste qui ne contient plus aucun tag devient None."""
+
+    Une liste qui ne contient plus aucun tag devient None ; une valeur qui n'est pas
+    une liste est renvoyée telle quelle.
+    """
     if not _is_list(tags):
         return tags
     cleaned = []
@@ -137,16 +157,20 @@ def _clean_tags(tags):
 
 
 def _brand_key(name: str) -> str:
-    """Clé de regroupement : sans accents, sans casse, lettres et chiffres uniquement.
-    'Le-Clerc', 'leclerc' et 'Léclerc' donnent tous 'leclerc'."""
+    """Renvoie la clé de regroupement d'une marque : sans accents, sans casse, lettres et chiffres uniquement.
+
+    'Le-Clerc', 'leclerc' et 'Léclerc' donnent tous 'leclerc'.
+    """
     without_accents = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     key = re.sub(r"[^a-z0-9]", "", without_accents.lower())
     return key or name  # marque sans aucun caractère latin : on la garde telle quelle
 
 
 def _merge_brand_spellings(brands: pd.Series) -> pd.Series:
-    """Ramène les variantes d'une même marque à sa graphie la plus fréquente
-    (à égalité, la première dans l'ordre alphabétique)."""
+    """Ramène les variantes d'une même marque à sa graphie la plus fréquente.
+
+    À égalité, la première dans l'ordre alphabétique est retenue.
+    """
     all_brands = brands.explode().dropna()
     if all_brands.empty:
         return brands
@@ -171,12 +195,19 @@ def _merge_brand_spellings(brands: pd.Series) -> pd.Series:
 
 
 def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    """Règle de normalisation des textes :
+    """Normalise les noms de produits, les grades, les tags et les marques.
+
     - Noms de produits : espaces superflus retirés, noms vides -> NA,
-      noms tout en majuscules -> seule la première lettre en majuscule
-    - Grades (nutriscore, environmental score) : 'unknown' -> NA
-    - Tags : préfixe de langue retiré ('fr:', 'en:'...), minuscules, tags vides et doublons retirés
-    - Marques : variantes d'écriture (casse, accents, tirets, espaces) ramenées à leur graphie la plus fréquente
+      noms tout en majuscules -> seule la première lettre en majuscule.
+    - Grades (nutriscore, environmental score) : 'unknown' -> NA.
+    - Tags : préfixe de langue retiré ('fr:', 'en:'...), minuscules, tags vides et doublons retirés.
+    - Marques : variantes d'écriture (casse, accents, tirets, espaces) ramenées à leur graphie la plus fréquente.
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
     """
     res = df.copy()
 
@@ -238,12 +269,20 @@ def normalize_texts(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
 
 def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    """Règle de bornage des nutriments :
-    - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place
+    """Remplace par NA les valeurs de nutriments hors bornes ou incohérentes.
+
+    - Si des nutriments sont négatifs, ces derniers sont déclarés NA à la place.
     - Si des nutriments sont au-dessus de 100 g/100 g -> NA (exception pour le sodium borné à 40 g/100 g).
-    Pour l'énergie (`energy-kcal_100g` et `energy_100g`), seule la négativité est corrigée (pas de borne haute fixe).
+      Pour l'énergie (`energy-kcal_100g` et `energy_100g`), seule la négativité est corrigée
+      (pas de borne haute fixe).
     - Si sucres > glucides + 0,5 -> sucres = NA.
     - Si saturés > lipides + 0,5 -> saturés = NA.
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
     """
     res = df.copy(deep=True)
 
@@ -311,9 +350,18 @@ def limit_nutriments(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
 
 def _compute_macro_energy(carbs: pd.Series, proteins: pd.Series, fat: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """Calcule l'énergie théorique via la formule 4/4/9 (kcal), et un masque
-    indiquant si au moins un macronutriment est renseigné pour la ligne.
+    """Calcule l'énergie théorique (kcal) via la formule 4/4/9.
+
     Les macronutriments manquants comptent pour 0 dans le calcul.
+
+    Args:
+        carbs: glucides (g/100 g).
+        proteins: protéines (g/100 g).
+        fat: lipides (g/100 g).
+
+    Returns:
+        Énergie calculée, et masque indiquant si au moins un macronutriment
+        est renseigné pour la ligne.
     """
     calc = carbs.fillna(0) * 4 + proteins.fillna(0) * 4 + fat.fillna(0) * 9
     has_macros = carbs.notna() | proteins.notna() | fat.notna()
@@ -321,8 +369,10 @@ def _compute_macro_energy(carbs: pd.Series, proteins: pd.Series, fat: pd.Series)
 
 
 def _is_calc_plausible(calc: pd.Series) -> pd.Series:
-    """Un calcul 4/4/9 n'est une base de recalcul valable que s'il reste
-    lui-même sous la borne plausible (KCAL_MAX). Sinon, les macronutriments
+    """Indique, ligne par ligne, si le calcul 4/4/9 est plausible (<= `KCAL_MAX`).
+
+    Un calcul 4/4/9 n'est une base de recalcul valable que s'il reste
+    lui-même sous la borne plausible (`KCAL_MAX`). Sinon, les macronutriments
     source sont eux-mêmes aberrants et recalculer ne ferait que remplacer
     une valeur impossible par une autre.
     """
@@ -330,9 +380,11 @@ def _is_calc_plausible(calc: pd.Series) -> pd.Series:
 
 
 def _get_alcohol_exception_mask(res: pd.DataFrame) -> pd.Series:
-    """Les boissons alcoolisées apportent de l'énergie que les macronutriments
-    seuls n'expliquent pas (l'alcool lui-même) : aucune sous-règle de cette
-    fonction ne doit s'appliquer à ce rayon.
+    """Renvoie le masque des produits du rayon 'Alcoholic beverages'.
+
+    Les boissons alcoolisées apportent de l'énergie que les macronutriments
+    seuls n'expliquent pas (l'alcool lui-même) : aucune sous-règle de `fix_energy`
+    ne doit s'appliquer à ce rayon. Sans colonne `rayon`, aucun produit n'est exclu.
     """
     if "rayon" not in res.columns:
         return pd.Series(False, index=res.index)
@@ -340,12 +392,17 @@ def _get_alcohol_exception_mask(res: pd.DataFrame) -> pd.Series:
 
 
 def _fix_missing_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series) -> dict[str, pd.Series]:
-    """kcal manquante : recalculée si des macronutriments plausibles sont
-    disponibles, sinon laissée manquante (rien à en tirer).
+    """Recalcule les kcal manquantes à partir des macronutriments.
+
+    kcal manquante : recalculée si des macronutriments plausibles sont
+    disponibles, sinon laissée manquante (rien à en tirer). `kcal` est modifiée sur place.
+
+    Returns:
+        Masques `recomputable` (lignes recalculées) et `still_invalid` (toujours vide).
     """
     is_missing = eligible & kcal.isna() & has_macros
     recomputable = is_missing & _is_calc_plausible(calc)
-    # kcal est deja NA ici : pas de changement de valeur, donc pas de ligne "touchee".
+    # kcal est déjà NA ici : pas de changement de valeur, donc pas de ligne "touchee".
     still_invalid = pd.Series(False, index=kcal.index)
 
     kcal.loc[recomputable] = calc.loc[recomputable].round(1)
@@ -354,10 +411,16 @@ def _fix_missing_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, e
 
 
 def _fix_implausibly_high_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series) -> dict[str, pd.Series]:
-    """kcal > KCAL_MAX : recalculée si le calcul 4/4/9 est lui-même plausible,
+    """Corrige les kcal supérieures à `KCAL_MAX`.
+
+    kcal > `KCAL_MAX` : recalculée si le calcul 4/4/9 est lui-même plausible,
     sinon invalidée. Sans ce second cas, une ligne aux macronutriments
     eux-mêmes aberrants se verrait réassigner une valeur tout aussi
     impossible à chaque passage, sans jamais converger (idempotence cassée).
+    `kcal` est modifiée sur place.
+
+    Returns:
+        Masques `recomputable` (lignes recalculées) et `invalidated` (lignes mises à NA).
     """
     is_too_high = eligible & kcal.notna() & (kcal > KCAL_MAX)
     recomputable = is_too_high & has_macros & _is_calc_plausible(calc)
@@ -372,10 +435,15 @@ def _fix_implausibly_high_kcal(kcal: pd.Series, calc: pd.Series, has_macros: pd.
 def _fix_inconsistent_kcal(
     kcal: pd.Series, calc: pd.Series, has_macros: pd.Series, eligible: pd.Series, already_handled: pd.Series
 ) -> pd.Series:
-    """kcal déclarée trop éloignée du calcul 4/4/9 (>50% d'écart relatif),
-    seulement quand ce calcul est assez significatif (>= 50 kcal) pour que
-    l'écart relatif ait un sens statistique. Les lignes déjà traitées par
-    la règle des kcal trop hautes sont exclues pour ne pas les recalculer deux fois.
+    """Recalcule les kcal déclarées trop éloignées du calcul 4/4/9.
+
+    Une kcal est incohérente si l'écart relatif dépasse 50 %, seulement quand ce
+    calcul est assez significatif (>= 50 kcal) pour que l'écart relatif ait un sens
+    statistique. Les lignes déjà traitées par la règle des kcal trop hautes sont
+    exclues pour ne pas les recalculer deux fois. `kcal` est modifiée sur place.
+
+    Returns:
+        Masque des lignes recalculées.
     """
     calc_is_significant = has_macros & (calc >= MIN_CALC_FOR_CONSISTENCY_CHECK)
     calc_is_plausible = _is_calc_plausible(calc)
@@ -395,7 +463,9 @@ def _fix_inconsistent_kcal(
 
 
 def _realign_kj_with_kcal(kj: pd.Series, kcal: pd.Series) -> pd.Series:
-    """Les kJ doivent toujours être cohérents avec les kcal finales :
+    """Recalcule les kJ à partir des kcal finales.
+
+    Les kJ doivent toujours être cohérents avec les kcal finales :
     recalculés là où kcal est connue, remis à NA là où kcal ne l'est plus
     (ex. invalidée par une des règles ci-dessus).
     """
@@ -405,7 +475,9 @@ def _realign_kj_with_kcal(kj: pd.Series, kcal: pd.Series) -> pd.Series:
 
 
 def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
-    """Règle de correction de l'énergie, appliquée dans cet ordre :
+    """Corrige l'énergie (kcal et kJ) à l'aide de la formule 4/4/9.
+
+    Sous-règles appliquées dans cet ordre :
 
     1. kcal manquante + macronutriments plausibles -> recalcul via la formule 4/4/9.
     2. kcal > KCAL_MAX (900) -> recalcul si le calcul 4/4/9 est lui-même plausible,
@@ -415,6 +487,12 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
     Aucune de ces règles ne s'applique au rayon 'Alcoholic beverages' : l'alcool
     apporte de l'énergie que les macronutriments seuls n'expliquent pas.
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
     """
     res = df.copy(deep=True)
     rows_before = len(df)
@@ -464,10 +542,17 @@ def fix_energy(df: pd.DataFrame) -> Tuple[pd.DataFrame, Report]:
 
 
 def set_column_types(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
-    """Fixe les types de colonnes attendus par la suite du pipeline :
-    code en string, compteurs (nova_group, nutriscore_score) en
+    """Fixe les types de colonnes attendus par la suite du pipeline.
+
+    Code en string, compteurs (`nova_group`, `nutriscore_score`) en
     Int64 nullable, nutriments en float64. Ne modifie aucune valeur,
     seulement le dtype.
+
+    Args:
+        df: DataFrame à typer.
+
+    Returns:
+        DataFrame typé et compte rendu (aucune ligne touchée).
     """
     rows_before = len(df)
     df = df.copy()
@@ -488,18 +573,23 @@ def set_column_types(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
 
 
 def deduplicate_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
-    """
-    Normalise les codes-barres (espaces), écarte les lignes sans code,
+    """Normalise les codes-barres et ne garde qu'une fiche par code.
+
+    Retire les espaces des codes-barres, écarte les lignes sans code,
     et ne garde qu'une fiche par code : en cas de doublon, on retient
     la plus complète (`completeness` la plus haute), puis en cas d'égalité
     la plus récente (`last_modified_t` le plus grand).
-    :param df: DataFrame à nettoyer
-    :return: DataFrame nettoyé et compte rendu de ce qui a été modifié
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
     """
     res = df.copy()
     res["code"] = res["code"].str.strip()
 
-    # Ecarte les lignes sans code
+    # Écarte les lignes sans code
     missing_code_mask = df["code"].isna() | (df["code"].str.strip() == "")
     nb_missing_code = int(missing_code_mask.sum())
     res = res.loc[~missing_code_mask]
@@ -524,14 +614,19 @@ def deduplicate_codes(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
 
 
 def handle_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
-    """
-    Ajout de 'main_category' dérivé du dernier tag de 'categories_tags'
-    Ajout d'un drapeau 'category_empty' pour les categories vides
-    Ajout d'une colonne 'food_group' pour le rayon dérivé du premier élément de 'food_groups_tags'
-    ayant 'unknown pour les rayons vide
-    Suppression de tous les produits ayant une categorie vide et un rayon unknown
-    :param df: DataFrame à nettoyer
-    :return: DataFrame nettoyé et compte rendu de ce qui a été modifié
+    """Dérive la catégorie et le rayon, puis supprime les produits inclassables.
+
+    - Ajoute `main_category`, dérivée du dernier tag de `categories_tags`.
+    - Ajoute un drapeau `category_empty` pour les catégories vides.
+    - Ajoute une colonne `food_group` (rayon) dérivée du premier élément de `food_groups_tags`,
+      valant 'unknown' pour les rayons vides.
+    - Supprime tous les produits ayant une catégorie vide et un rayon 'unknown'.
+
+    Args:
+        df: DataFrame à nettoyer.
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
     """
     res = df.copy()
 
@@ -573,8 +668,10 @@ def handle_empty_categories(df: pd.DataFrame) -> tuple[pd.DataFrame, Report]:
 
 
 def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
-    """Crée `<colonne>_empty` (booléen) sans toucher à la colonne d'origine.
-    Retourne le nombre de valeurs manquantes détectées.
+    """Crée `<colonne>_manquant` (booléen) sans toucher à la colonne d'origine.
+
+    Returns:
+        DataFrame avec le drapeau ajouté, et nombre de valeurs manquantes détectées.
     """
     res = df.copy()
     mask = res[column].isna()
@@ -583,7 +680,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
 
 
 def _is_list_column(series: pd.Series) -> bool:
-    """True si la colonne contient des listes (VARCHAR[] côté DuckDB).
+    """Indique si la colonne contient des listes (VARCHAR[] côté DuckDB).
 
     DuckDB renvoie les listes en `object` : on inspecte la première valeur non nulle.
     """
@@ -599,6 +696,9 @@ def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> tuple[pd.D
     - Colonne scalaire : la constante est castée au dtype de la colonne pour
       éviter de polluer une colonne numérique avec une string.
     - Colonne liste (VARCHAR[]) : chaque manquant devient `[raw_value]`.
+
+    Returns:
+        DataFrame imputé et nombre de valeurs remplacées.
     """
     res = df.copy()
     mask = res[column].isna()
@@ -620,8 +720,12 @@ def _apply_constant(df: pd.DataFrame, column: str, raw_value: str) -> tuple[pd.D
 
 def _apply_median_by_department(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """Remplace chaque manquant par la médiane de son propre rayon (`res['rayon']`).
+
     Usage applicatif uniquement (affichage/substitution) : ne remplace pas
     l'imputation ML, qui se fait après le split, dans le pipeline dédié.
+
+    Returns:
+        DataFrame imputé et nombre de valeurs manquantes avant imputation.
     """
     res = df.copy()
     mask = res[column].isna()
@@ -634,7 +738,11 @@ def _apply_median_by_department(df: pd.DataFrame, column: str) -> tuple[pd.DataF
 
 def _apply_mode(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """Remplace les manquants par la valeur la plus fréquente de la colonne.
+
     En cas d'égalité entre plusieurs modes, la première (ordre pandas) est retenue.
+
+    Returns:
+        DataFrame imputé et nombre de valeurs remplacées.
     """
     res = df.copy()
     mask = res[column].isna()
@@ -651,18 +759,26 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
     """Applique une décision par colonne pour traiter les valeurs manquantes.
 
     Vocabulaire fermé pour `strategy[colonne]` :
-        - "keep"            : ne rien faire.
-        - "flag"           : ajoute `<colonne>_manquant` (booléen), sans imputer.
-        - "constant:<v>"     : remplace les manquants par la valeur `<v>`.
-        - "foodgroup_median"     : impute par la médiane du rayon (usage applicatif,
-                                 pas une imputation ML — voir docstring des helpers).
-        - "mode"              : impute par la valeur la plus fréquente.
+        - "keep" : ne rien faire.
+        - "flag" : ajoute `<colonne>_manquant` (booléen), sans imputer.
+        - "constant:<v>" : remplace les manquants par la valeur `<v>`.
+        - "foodgroup_median" : impute par la médiane du rayon (usage applicatif,
+          pas une imputation ML — voir docstring des helpers).
+        - "mode" : impute par la valeur la plus fréquente.
         - "drop_column" : retire la colonne du DataFrame.
 
     En complément, toute ligne n'ayant AUCUN nutriment clé renseigné est supprimée
     (un produit sans aucune valeur nutritionnelle n'a pas sa place dans le catalogue).
 
-    Lève `ValueError` si une décision ne fait partie d'aucune des six catégories.
+    Args:
+        df: DataFrame à nettoyer.
+        strategy: décision à appliquer pour chaque colonne (par défaut `DEFAULT_STRATEGY`).
+
+    Returns:
+        DataFrame nettoyé et compte rendu de ce qui a été modifié.
+
+    Raises:
+        ValueError: une décision ne fait partie d'aucune des six catégories.
     """
     res = df.copy()
     rows_before = len(res)
