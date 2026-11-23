@@ -15,13 +15,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def psql_insert_copy(table: pd.DataFrame, conn: Connection, keys: list[str], data_iter: Iterator[Any]) -> None:
-    """
-    Insertion en base en créant un buffer CSV, utilise COPY au lieu d'INSERT (rapide pour gros volumes).
+    """Insère des lignes en base via un buffer CSV, avec COPY au lieu d'INSERT (rapide pour gros volumes).
 
-    :param table: DataFrame à insérer dans la base de données
-    :param conn: Connexion à la BDD
-    :param keys: Liste des colonnes à inclure dans l'insertion
-    :param data_iter: Iterateur sur les lignes du DataFrame à insérer
+    S'utilise comme `method=` de `DataFrame.to_sql`, qui fournit les quatre
+    arguments.
+
+    Args:
+        table: table cible fournie par pandas (`SQLTable`, avec `name` et
+            `schema`), pour le DataFrame à insérer dans la base de données.
+        conn: connexion à la BDD.
+        keys: liste des colonnes à inclure dans l'insertion.
+        data_iter: itérateur sur les lignes du DataFrame à insérer.
     """
 
     dbapi_conn = conn.connection

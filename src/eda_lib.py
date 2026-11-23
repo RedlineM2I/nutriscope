@@ -1,3 +1,10 @@
+"""Fonctions de l'analyse exploratoire (EDA) des produits Open Food Facts.
+
+Résumés univariés, profils et complétude par rayon, incohérences métier,
+corrélations avec le Nutri-Score, valeurs extrêmes (z-score robuste) et
+comparaison de deux groupes (d de Cohen, test de Mann-Whitney).
+Les colonnes sont converties en numérique à la volée (valeur invalide -> NaN).
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,11 +31,23 @@ NUTRIMENT_COLS = [
 
 
 def _as_numeric(s: pd.Series) -> pd.Series:
+    """Convertit la série en numérique ; une valeur non convertible devient NaN."""
     return pd.to_numeric(s, errors="coerce")
 
 
 def clean_minimal_tp10(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply fallback cleaning rules from TP10 when TP9 output is unavailable."""
+    """Applique les règles de nettoyage de secours du TP10, quand la sortie du TP9 est indisponible.
+
+    Supprime les codes en double (premier gardé), puis les produits dont un nutriment
+    est hors de [0, 100] g/100 g ou dont l'énergie est hors de [0, 900] kcal/100 g.
+    Les valeurs manquantes sont conservées.
+
+    Args:
+        df: produits à nettoyer.
+
+    Returns:
+        Copie nettoyée de `df`.
+    """
     cleaned = df.copy()
 
     cleaned = cleaned.drop_duplicates(subset=["code"], keep="first")
@@ -59,6 +78,15 @@ def clean_minimal_tp10(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_known_rayon(df: pd.DataFrame, group_col: str = "pnns_groups_1") -> pd.DataFrame:
+    """Garde les produits dont le rayon est renseigné et différent de « unknown ».
+
+    Args:
+        df: produits à filtrer.
+        group_col: colonne du rayon.
+
+    Returns:
+        Copie filtrée de `df` (copie complète si la colonne n'existe pas).
+    """
     if group_col not in df.columns:
         return df.copy()
     mask = df[group_col].notna() & (~df[group_col].astype(str).str.lower().eq("unknown"))
@@ -66,6 +94,21 @@ def filter_known_rayon(df: pd.DataFrame, group_col: str = "pnns_groups_1") -> pd
 
 
 def resume_univarie(s: pd.Series, quantiles: Iterable[float] = (0.05, 0.25, 0.5, 0.75, 0.95)) -> dict:
+    """Calcule le résumé statistique d'une variable numérique.
+
+    Le MAD est mis à l'échelle de l'écart-type (`scale="normal"`) ; le coefficient de
+    variation vaut NaN si la moyenne est nulle. Sans aucune valeur valide, toutes les
+    statistiques valent NaN.
+
+    Args:
+        s: variable à résumer.
+        quantiles: quantiles à calculer, entre 0 et 1.
+
+    Returns:
+        Effectifs (`n`, `n_valid`, `n_missing`, `missing_rate`), position et dispersion
+        (`mean`, `median`, `std`, `iqr`, `mad`, `cv`), forme (`skew`, `kurtosis`) et un
+        `qXX` par quantile (ex. `q05`).
+    """
     x = _as_numeric(s).dropna()
     n_total = int(s.shape[0])
     n_valid = int(x.shape[0])
@@ -123,6 +166,19 @@ def profil_par_rayon(
     group_col: str = "pnns_groups_1",
     min_n: int = 30,
 ) -> tuple[pd.DataFrame, list[str]]:
+    """Décrit chaque nutriment par rayon : effectif, moyenne, médiane, Q1 et Q3.
+
+    Les rayons inconnus et ceux de moins de `min_n` produits sont écartés.
+
+    Args:
+        df: produits à décrire.
+        colonnes: nutriments à décrire.
+        group_col: colonne du rayon.
+        min_n: nombre minimal de produits pour garder un rayon.
+
+    Returns:
+        Le tableau (une ligne par rayon et nutriment) et la liste des rayons écartés.
+    """
     base = filter_known_rayon(df, group_col=group_col)
     counts = base.groupby(group_col, observed=True).size().rename("n")
     valid_groups = counts[counts >= min_n].index
@@ -147,6 +203,20 @@ def profil_par_rayon(
 
 
 def crosstab_percent_and_cramers_v(df: pd.DataFrame, col_a: str, col_b: str) -> tuple[pd.DataFrame, float]:
+    """Croise deux variables qualitatives et mesure leur lien par le V de Cramér.
+
+    Le V de Cramér (0 = aucun lien, 1 = lien parfait) est calculé à partir du chi², avec
+    la correction du biais pour les petits effectifs.
+
+    Args:
+        df: produits à analyser.
+        col_a: variable en lignes.
+        col_b: variable en colonnes.
+
+    Returns:
+        Le tableau croisé en % par ligne et le V de Cramér (NaN si le tableau est vide
+        ou s'il n'a pas assez de modalités).
+    """
     tab = pd.crosstab(df[col_a], df[col_b], normalize="index") * 100
     observed = pd.crosstab(df[col_a], df[col_b])
     if observed.empty:
@@ -173,6 +243,21 @@ def completude_par_groupe(
     colonnes: list[str],
     min_n: int = 20,
 ) -> pd.DataFrame:
+    """Mesure, par groupe, le taux de présence de chaque colonne et des fiches complètes.
+
+    Les groupes de moins de `min_n` produits sont écartés. Une fiche est complète si
+    toutes les `colonnes` sont renseignées.
+
+    Args:
+        df: produits à analyser.
+        groupe: colonne du groupe.
+        colonnes: colonnes dont on mesure la présence.
+        min_n: nombre minimal de produits pour garder un groupe.
+
+    Returns:
+        Une ligne par groupe (`n`, `presence_<colonne>`, `taux_fiches_completes`, et
+        `presence_nutriscore_score` si la colonne existe), triée par effectif décroissant.
+    """
     work = df.copy()
     counts = work.groupby(groupe, observed=True).size().rename("n")
     valid_groups = counts[counts >= min_n].index
@@ -195,6 +280,19 @@ def completude_par_groupe(
 
 
 def incoherences_metier(df: pd.DataFrame) -> pd.DataFrame:
+    """Repère, produit par produit, les incohérences entre valeurs nutritionnelles.
+
+    Indicateurs : sucres > glucides, saturés > lipides, écart de plus de 0,2 g entre
+    le sel et 2,5 x sodium, énergie éloignée de plus de 150 kcal du calcul
+    9 x lipides + 4 x glucides + 4 x protéines + 2 x fibres, énergie nulle malgré des
+    macronutriments. Une comparaison impossible (valeur manquante) vaut False.
+
+    Args:
+        df: produits à contrôler.
+
+    Returns:
+        Un indicateur booléen par incohérence (colonnes), même index que `df`.
+    """
     work = df.copy()
     for col in NUTRIMENT_COLS:
         if col in work.columns:
@@ -233,6 +331,21 @@ def correlations_nutriscore(
     cible: str = "nutriscore_score",
     min_n: int = 30,
 ) -> pd.DataFrame:
+    """Calcule les corrélations de Pearson et de Spearman de chaque variable avec la cible.
+
+    Seules les paires sans valeur manquante comptent ; une variable avec moins de
+    `min_n` paires est ignorée.
+
+    Args:
+        df: produits à analyser.
+        colonnes: variables à corréler.
+        cible: variable cible.
+        min_n: nombre minimal de paires pour calculer la corrélation.
+
+    Returns:
+        Une ligne par variable (`n`, `pearson`, `spearman`), triée par |Spearman|
+        décroissant (vide si aucune variable n'a assez de paires).
+    """
     rows = []
     y = _as_numeric(df[cible])
     for col in colonnes:
@@ -252,6 +365,16 @@ def correlations_nutriscore(
 
 
 def paires_redondantes(matrice: pd.DataFrame, seuil: float = 0.8) -> pd.DataFrame:
+    """Liste les paires de variables dont la corrélation dépasse le seuil en valeur absolue.
+
+    Args:
+        matrice: matrice de corrélation carrée.
+        seuil: |corrélation| minimale pour retenir une paire.
+
+    Returns:
+        Une ligne par paire (`var_a`, `var_b`, `corr`, `abs_corr`), triée par
+        |corrélation| décroissante (vide si aucune paire).
+    """
     rows = []
     cols = list(matrice.columns)
     for i, a in enumerate(cols):
@@ -272,6 +395,20 @@ def correlations_par_rayon(
     group_col: str = "pnns_groups_1",
     min_n: int = 30,
 ) -> pd.DataFrame:
+    """Calcule, rayon par rayon, les corrélations de Spearman et de Pearson entre une variable et la cible.
+
+    Les rayons inconnus et ceux de moins de `min_n` paires complètes sont ignorés.
+
+    Args:
+        df: produits à analyser.
+        colonne: variable à corréler.
+        cible: variable cible.
+        group_col: colonne du rayon.
+        min_n: nombre minimal de paires pour garder un rayon.
+
+    Returns:
+        Une ligne par rayon (`n`, `spearman`, `pearson`), triée par effectif décroissant.
+    """
     work = filter_known_rayon(df, group_col=group_col)
     rows = []
     for grp, part in work.groupby(group_col, observed=True):
@@ -291,6 +428,18 @@ def correlations_par_rayon(
 
 
 def zscore_robuste(s: pd.Series) -> pd.Series:
+    """Calcule le z-score robuste : (x - médiane) / MAD.
+
+    Le MAD est mis à l'échelle de l'écart-type, ce qui rend le score peu sensible aux
+    valeurs extrêmes. Si le MAD est nul, on divise par l'écart-type ; si lui aussi est
+    nul, tous les scores valent 0.
+
+    Args:
+        s: variable à standardiser.
+
+    Returns:
+        Z-score robuste de chaque valeur, même index que `s`.
+    """
     x = _as_numeric(s)
     med = x.median(skipna=True)
     mad = stats.median_abs_deviation(x.dropna(), scale="normal")
@@ -308,6 +457,21 @@ def extremes_restants(
     group_col: str = "pnns_groups_1",
     seuil: float = 3.5,
 ) -> pd.DataFrame:
+    """Liste les valeurs extrêmes restantes, rayon par rayon.
+
+    Une valeur est extrême si son z-score robuste, calculé dans son rayon, dépasse
+    `seuil` en valeur absolue.
+
+    Args:
+        df: produits à analyser (avec `code` et `product_name`).
+        colonnes: variables à contrôler.
+        group_col: colonne du rayon.
+        seuil: |z-score robuste| au-delà duquel une valeur est extrême.
+
+    Returns:
+        Une ligne par valeur extrême (rayon, `code`, `product_name`, `variable`, `value`,
+        `z_robuste`), triée par |z| décroissant.
+    """
     work = filter_known_rayon(df, group_col=group_col)
     rows = []
     for grp, part in work.groupby(group_col, observed=True):
@@ -330,6 +494,18 @@ def extremes_restants(
 
 @dataclass
 class GroupCompareResult:
+    """Regroupe le résultat de la comparaison de deux groupes (`comparer_deux_groupes`).
+
+    Attributes:
+        n_a: nombre de valeurs valides du groupe A.
+        n_b: nombre de valeurs valides du groupe B.
+        median_a: médiane du groupe A.
+        median_b: médiane du groupe B.
+        delta_median: médiane de A moins médiane de B.
+        cohen_d: d de Cohen (écart des moyennes divisé par l'écart-type commun).
+        mann_whitney_u: statistique U du test de Mann-Whitney.
+        p_value: p-valeur bilatérale du test de Mann-Whitney.
+    """
     n_a: int
     n_b: int
     median_a: float
@@ -341,6 +517,19 @@ class GroupCompareResult:
 
 
 def comparer_deux_groupes(a: pd.Series, b: pd.Series) -> GroupCompareResult:
+    """Compare une variable entre deux groupes : taille d'effet et test de Mann-Whitney.
+
+    Le d de Cohen mesure l'écart des moyennes ; le test de Mann-Whitney (bilatéral,
+    sans hypothèse de loi normale) dit si les deux distributions diffèrent.
+
+    Args:
+        a: valeurs du groupe A.
+        b: valeurs du groupe B.
+
+    Returns:
+        Résultat de la comparaison ; statistiques à NaN si un groupe a moins de
+        2 valeurs valides.
+    """
     x = _as_numeric(a).dropna()
     y = _as_numeric(b).dropna()
     if len(x) < 2 or len(y) < 2:

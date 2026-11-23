@@ -208,3 +208,38 @@ Pipeline bout-en-bout, jalon J3 (tag `v0.3`). Documentation : [docs/data/pipelin
 - `docs/data/rapport_nettoyage.md` est versionné mais réécrit par chaque `clean` : un `git status` le montre modifié après une exécution.
 - `data/exports/schema.json` n'est pas daté : un export d'un autre jour réécrit le schéma du précédent.
 - `docs/data/architecture.md` cite encore d'anciens chemins (`data/food_france.parquet`, `data/parquet/produits`).
+
+
+### TP-14
+
+Prédiction du Nutri-Score (a → e) : notebook `notebooks/ml_nutriscore.ipynb`, jeu `nutriscope_ml_sample.parquet` (24 076 produits en train, 5 965 en test, colonne `split` figée).
+
+**Synthèse**
+
+Forêt aléatoire avec `class_weight="balanced"` : F1 macro de 0,860 ± 0,006 en validation croisée et de 0,863 sur le test, contre 0,685 pour la meilleure baseline (arbre de profondeur 8). L'écart entre validation croisée et test (0,003) confirme que le protocole tient.
+
+**Choix**
+
+- Métrique principale : F1 macro. La baseline majoritaire a une accuracy 3,2 fois plus élevée que son F1 macro (0,286 contre 0,089) : sur des classes déséquilibrées, l'accuracy récompense le modèle qui répond toujours la classe majoritaire.
+- Toute la préparation est dans un seul `Pipeline` : imputation par la médiane avec indicateur de manquant, features dérivées (ratios graisses saturées/lipides et sucres/glucides, écart d'énergie 4/4/9) par `FunctionTransformer`, standardisation, one-hot avec `min_frequency=80`. Cela donne 66 colonnes. Un test vérifie que le préparateur n'a pas vu le test.
+- Validation croisée à 5 plis stratifiés, `random_state=42`, plis créés une seule fois et identiques pour tous les modèles.
+- Logistique multinomiale 0,767, forêt 0,858 : la forêt capte les interactions entre nutriments, ce que ne fait pas la logistique, linéaire.
+- Déséquilibre modéré (2,65 fois plus de « e » que de « b »). `class_weight="balanced"` ne change pas le F1 global (+0,002, sous l'écart-type), mais fait passer le rappel de « b » de 0,68 à 0,74. Je n'ai pas testé SMOTE : c'est plus complexe et ça risque de créer une fuite, pour un déséquilibre modéré.
+
+**Fuite**
+
+- `nutriscore_score` ajouté volontairement : le F1 passe à 0,986, et cette seule colonne pèse 0,671 en importance par permutation, contre 0,022 pour la suivante. La lettre est un découpage de ce score, et une fiche sans grade n'a pas de score non plus.
+- Correction : une liste `FORBIDDEN` (`nutriscore_score`, `code`, `product_name`, `brands`, `split`) est vérifiée par un `assert` dès la définition des features.
+- Contrôle négatif avec `completeness` : F1 inchangé (0,859) et importance de 0,001. Le détecteur ne crie pas au loup.
+- Importances du modèle honnête : sel, graisses saturées et sucres en tête, ce qui correspond aux composantes défavorables du barème. Lipides totaux, glucides totaux et rayons sont des proxies, pas des fuites. Fibres et fruits-légumes pèsent peu, car environ 45 % des valeurs manquent.
+
+**Erreurs analysées**
+
+- 722 erreurs sur le test, dont 90 % à une lettre près.
+- Trois cas de natures différentes : boudin blanc noté « a » avec 10,9 g de graisses saturées (fiche fausse), vodka (hors périmètre du Nutri-Score), jus carotte-mangue rangé dans « Fruits » alors que les boissons ont une grille plus sévère (règle absente des features).
+
+**Pour le TP 15**
+
+- Ajouter une feature « est une boisson » et exclure le rayon alcool.
+- Ajouter au nettoyage une règle de cohérence entre le grade déclaré et les nutriments.
+- Mesurer le gradient boosting avec la même préparation, les mêmes plis et les mêmes métriques.

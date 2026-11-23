@@ -1,15 +1,23 @@
+"""Retrait et restauration des contraintes PostgreSQL autour du chargement en masse."""
 from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import text
 
 
 def drop_constraints(conn, tables: list[str], types: tuple[str, ...] = ('f', 'p')) -> list[tuple]:
-    """
-    Supprime les contraintes (FK et/ou PK) des tables données pour accélérer le
-    COPY en masse. Jamais de nom de contrainte en dur : ils sont lus dans
-    pg_constraint, avec leur définition complète (pg_get_constraintdef) pour
-    pouvoir les recréer via restore_constraints. FK supprimées avant PK.
-    :return: lignes (table, conname, ddl, contype) à repasser à restore_constraints
+    """Supprime les contraintes (FK et/ou PK) des tables données pour accélérer le COPY en masse.
+
+    Jamais de nom de contrainte en dur : ils sont lus dans `pg_constraint`, avec
+    leur définition complète (`pg_get_constraintdef`) pour pouvoir les recréer
+    via `restore_constraints`. FK supprimées avant PK.
+
+    Args:
+        conn: connexion SQLAlchemy ouverte.
+        tables: noms des tables concernées.
+        types: types de contraintes à retirer (`'f'` = FK, `'p'` = PK).
+
+    Returns:
+        Lignes (table, conname, ddl, contype) à repasser à `restore_constraints`.
     """
     rows = conn.execute(text("""
                              SELECT rel.relname                   AS tbl,
@@ -29,12 +37,17 @@ def drop_constraints(conn, tables: list[str], types: tuple[str, ...] = ('f', 'p'
 
 
 def restore_constraints(engine, rows: list[tuple], max_workers: int = 3) -> None:
-    """
-    Recrée les contraintes retirées par drop_constraints, une connexion par
-    table en parallèle. Les tables de jonction sont indépendantes entre elles
-    (leurs FK référencent produits/categories/labels/marques/origines, jamais
-    une autre table de jonction), donc leurs index de PK peuvent se reconstruire
-    en parallèle sans se bloquer. À l'intérieur d'une même table, PK avant FK.
+    """Recrée les contraintes retirées par `drop_constraints`, une connexion par table en parallèle.
+
+    Les tables de jonction sont indépendantes entre elles (leurs FK référencent
+    produits/categories/labels/marques/origines, jamais une autre table de
+    jonction), donc leurs index de PK peuvent se reconstruire en parallèle sans
+    se bloquer. À l'intérieur d'une même table, PK avant FK.
+
+    Args:
+        engine: engine SQLAlchemy (chaque thread ouvre sa propre connexion).
+        rows: lignes renvoyées par `drop_constraints`.
+        max_workers: nombre de tables traitées en même temps.
     """
     by_table: dict[str, list[tuple]] = {}
     for row in rows:

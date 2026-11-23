@@ -11,11 +11,21 @@ BLUE, YELLOW, BOLD, RESET = "\033[34m", "\033[33m", "\033[1m", "\033[0m"
 WIDTH = 60
 
 def title1(text):
+    """Affiche un titre de niveau 1 en majuscules, centré entre deux lignes bleues.
+
+    Args:
+        text: texte du titre.
+    """
     print(f"\n{BLUE}{'=' * WIDTH}{RESET}")
     print(f"{BOLD}{text.upper().center(WIDTH)}{RESET}")
     print(f"{BLUE}{'=' * WIDTH}{RESET}\n")
 
 def title2(text):
+    """Affiche un titre de niveau 2 en majuscules, en jaune, précédé de `>>`.
+
+    Args:
+        text: texte du titre.
+    """
     print(f"\n{YELLOW}{BOLD} >> {text.upper()}{RESET}\n")
 
 
@@ -33,9 +43,15 @@ _paused = False               # vrai : le spinner n'écrit plus (voir pause_spin
 
 
 class _SpinnerSafeStdout:
-    """
-    Remplace sys.stdout tant que le spinner tourne : chaque ligne complète
-    efface d'abord la ligne du spinner, pour que print() s'affiche proprement.
+    """Remplace `sys.stdout` tant que le spinner tourne.
+
+    Chaque ligne complète efface d'abord la ligne du spinner, pour que `print()`
+    s'affiche proprement. Les lignes incomplètes sont gardées en mémoire tampon
+    jusqu'à leur `"
+"`.
+
+    Attributes:
+        stream: le vrai `stdout`, sur lequel on écrit.
     """
 
     def __init__(self, stream):
@@ -43,6 +59,14 @@ class _SpinnerSafeStdout:
         self._buffer = ""
 
     def write(self, text):
+        """Écrit les lignes complètes en effaçant d'abord la ligne du spinner.
+
+        Args:
+            text: texte à écrire (peut contenir zéro, une ou plusieurs lignes).
+
+        Returns:
+            Nombre de caractères reçus, comme `io.TextIOBase.write`.
+        """
         with _lock:
             self._buffer += text
             if "\n" in self._buffer:
@@ -52,11 +76,15 @@ class _SpinnerSafeStdout:
         return len(text)
 
     def flush(self):
+        """Ne fait rien : la ligne incomplète attend son `"
+"`."""
         pass    # une ligne incomplète attend son "\n", sinon le spinner l'écraserait
 
     def close_buffer(self):
         """Écrit la ligne incomplète restante (appelé une fois le spinner arrêté).
-        Le retour à la ligne évite qu'elle soit effacée par la ligne du timer."""
+
+        Le retour à la ligne évite qu'elle soit effacée par la ligne du timer.
+        """
         with _lock:
             if self._buffer:
                 self.stream.write(self._buffer + "\n")
@@ -64,11 +92,12 @@ class _SpinnerSafeStdout:
             self.stream.flush()
 
     def __getattr__(self, name):
+        """Délègue tout autre attribut (`isatty`, `encoding`...) au vrai stdout."""
         return getattr(self.stream, name)
 
 
 def _terminal():
-    """Le vrai stdout, même quand il est remplacé par _SpinnerSafeStdout."""
+    """Renvoie le vrai stdout, même quand il est remplacé par `_SpinnerSafeStdout`."""
     out = sys.stdout
     return out.stream if isinstance(out, _SpinnerSafeStdout) else out
 
@@ -85,10 +114,11 @@ log = _emit   # équivalent de print(), conservé pour le code existant
 
 @contextlib.contextmanager
 def pause_spinner():
-    """
-    Place le spinner sur la ligne en dessous d'un affichage qui gère lui-même sa ligne
-    (barre tqdm) : sinon les deux se réécrivent la même ligne en alternance (flickering).
-    Sans effet si aucun spinner ne tourne.
+    """Place le spinner sur la ligne en dessous d'un affichage qui gère lui-même sa ligne.
+
+    Sert pour la barre tqdm : sinon les deux se réécrivent la même ligne en
+    alternance (flickering). Sans effet si aucun spinner ne tourne. S'utilise
+    avec `with pause_spinner():`.
     """
     global _paused
     with _lock:
@@ -106,6 +136,16 @@ def pause_spinner():
 
 
 def _spin(stop, out):
+    """Anime le spinner jusqu'à ce que `stop` soit levé (exécuté dans un thread).
+
+    Toutes les 0,1 s, réécrit la ligne avec l'image suivante, le label le plus
+    interne et le temps écoulé. Le curseur est masqué pendant l'animation, puis
+    réaffiché.
+
+    Args:
+        stop: événement qui arrête l'animation.
+        out: flux du vrai terminal sur lequel dessiner.
+    """
     frames = itertools.cycle(FRAMES)
     t0 = time.perf_counter()
     with _lock:
@@ -131,8 +171,7 @@ def _spin(stop, out):
 
 
 def timer(func=None, *, label=None, store=None, spinner=True):
-    """
-    Mesure le temps d'exécution, avec indicateur d'activité animé.
+    """Mesure le temps d'exécution, avec indicateur d'activité animé.
 
     Utilisable de 5 façons :
         @timer
@@ -145,6 +184,15 @@ def timer(func=None, *, label=None, store=None, spinner=True):
     même si la fonction lève. Les timers imbriqués partagent un seul spinner,
     qui affiche toujours l'étape la plus interne. Le spinner est désactivé
     automatiquement hors terminal (fichier, pipe, notebook).
+
+    Args:
+        func: fonction décorée (forme `@timer`), ou None (forme `@timer(...)`).
+        label: nom affiché ; par défaut le `__qualname__` de la fonction.
+        store: dictionnaire où ranger la durée, sous la clé `label`.
+        spinner: si faux, pas d'animation (le temps est quand même affiché).
+
+    Returns:
+        La fonction décorée (forme `@timer`), ou le décorateur (forme `@timer(...)`).
     """
 
     def decorator(fn):
