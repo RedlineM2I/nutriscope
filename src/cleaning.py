@@ -675,7 +675,7 @@ def _apply_flag(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, int]:
     """
     res = df.copy()
     mask = res[column].isna()
-    res[f"{column}_manquant"] = mask
+    res[f"{column}_empty"] = mask
     return res, int(mask.sum())
 
 
@@ -760,7 +760,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
     Vocabulaire fermé pour `strategy[colonne]` :
         - "keep" : ne rien faire.
-        - "flag" : ajoute `<colonne>_manquant` (booléen), sans imputer.
+        - "flag" : ajoute `<colonne>_empty` (booléen), sans imputer.
         - "constant:<v>" : remplace les manquants par la valeur `<v>`.
         - "foodgroup_median" : impute par la médiane du rayon (usage applicatif,
           pas une imputation ML — voir docstring des helpers).
@@ -793,7 +793,7 @@ def missing_values_strategy(df: pd.DataFrame, strategy: dict[str, str] = DEFAULT
 
             case "flag":
                 res, nb = _apply_flag(res, column)
-                global_touched_mask |= res[f"{column}_manquant"]
+                global_touched_mask |= res[f"{column}_empty"]
 
             case "foodgroup_median":
                 mask_before = res[column].isna()
