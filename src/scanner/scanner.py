@@ -95,13 +95,13 @@ def normalize(res_json: Any, result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _call_model(url_image, client: OpenAI) -> tuple[str | None, int, int]:
+def _call_model(url_image, client: OpenAI, message) -> tuple[str | None, int, int]:
     system_prompt = Path(__file__).with_name("system_prompt.md").read_text(encoding="utf-8")
     messages = [
         {"role": "system", "content": system_prompt},
         {
             "role": "user", "content": [
-            {"type": "text", "text": "Recopie le tableau nutritionnel de cette photo."},
+            {"type": "text", "text": message},
             {"type": "image_url", "image_url": {"url": url_image}}, ]
         }
     ]
@@ -153,24 +153,27 @@ def scan_label(image: Path | bytes | str):
         empty_json["alertes"].append("Impossible de lire l'image fournie")
         return empty_json
 
-    try:
-        start = time.perf_counter()
-        response, prompt_tokens, completion_tokens = _call_model(
-            url_image,
-            client=OpenAI(base_url="http://localhost:11434/v1", api_key="ollama"),
-        )
-        perf = time.perf_counter() - start
-    except APIError as e:
-        empty_json["alertes"].append(f"Erreur API du modèle : {e}")
-        return empty_json
-    except Exception as e:
-        empty_json["alertes"].append(f"Impossible de contacter le modèle : {e}")
-        return empty_json
-
-    model_calls = 1
-    empty_json = empty_result(model_calls, perf, prompt_tokens, completion_tokens)
-    res_json = _extract_json(response)
-    res = normalize(res_json, empty_json)
+    nb_try = 3
+    model_calls = 0
+    message = "Recopie le tableau nutritionnel de cette photo."
+    for i in range(nb_try) :
+        try:
+            start = time.perf_counter()
+            response, prompt_tokens, completion_tokens = _call_model(
+                url_image,
+                client=OpenAI(base_url="http://localhost:11434/v1", api_key="ollama"), message=message
+            )
+            perf = time.perf_counter() - start
+        except APIError as e:
+            empty_json["alertes"].append(f"Erreur API du modèle : {e}")
+            return empty_json
+        except Exception as e:
+            empty_json["alertes"].append(f"Impossible de contacter le modèle : {e}")
+            return empty_json
+        model_calls += 1
+        empty_json = empty_result(model_calls, perf, prompt_tokens, completion_tokens)
+        res_json = _extract_json(response)
+        res = normalize(res_json, empty_json)
     return res
 
 
