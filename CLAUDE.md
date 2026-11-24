@@ -69,6 +69,8 @@ Je me suis trop reposé sur l'IA jusqu'ici : le code est devenu plus complexe qu
 | tqdm | barre de progression du téléchargement (`src/fetch_data.py`) |
 | pytest | tests (CI/CD) |
 | scikit-learn, imbalanced-learn (`requirements-notebooks.txt`) | pipeline, modèles, validation croisée, métriques du modèle Nutri-Score |
+| xgboost, lightgbm | implémentations de gradient boosting comparées au TP15 en plus de HistGradientBoostingClassifier pour satisfaire l'exigence de trois gradient boosting |
+| optuna | recherche d'hyperparamètres avec budget fixé, arrêt anticipé des essais peu prometteurs pour un modèle |
 
 Le projet est **en cours** : d'autres briques arriveront (visualisation, deep learning, API…).
 Toute nouvelle dépendance doit être justifiée et ajoutée ici avec son rôle.

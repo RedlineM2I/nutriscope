@@ -6,3 +6,6 @@ nbformat==5.11.1
 plotly==6.9.0
 scikit-learn
 imbalanced-learn
+xgboost==3.4.*
+lightgbm==4.7.* 
+optuna==5.*
