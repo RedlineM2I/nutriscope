@@ -243,3 +243,52 @@ Forêt aléatoire avec `class_weight="balanced"` : F1 macro de 0,860 ± 0,006 en
 - Ajouter une feature « est une boisson » et exclure le rayon alcool.
 - Ajouter au nettoyage une règle de cohérence entre le grade déclaré et les nutriments.
 - Mesurer le gradient boosting avec la même préparation, les mêmes plis et les mêmes métriques.
+
+### TP-15
+
+Méthodes d'ensemble : notebook `notebooks/methodes_ensemble.ipynb`, même jeu et même
+`split` que le TP 14. Livrables : `docs/decisions/ADR-001-modele-nutriscore.md`,
+`docs/ml/limites_nutriscore.md`.
+
+**Synthèse**
+
+LightGBM avec ses réglages par défaut est retenu : F1 macro de 0,888 ± 0,007 en validation
+croisée et de 0,886 sur le test, contre 0,858 pour la forêt du TP 14. Les trois boosters
+(HistGB, XGBoost, LightGBM) sont indiscernables en F1 ; LightGBM est choisi sur la latence
+(7,6 ms par produit), la taille (1,74 Mo) et le temps de réentraînement (0,7 s).
+
+**Choix**
+
+- Logistique et forêt réentraînées dans le nouveau notebook : 0,767 et 0,858, identiques au
+  TP 14. La préparation n'a pas bougé.
+- Cible encodée en entiers (`LabelEncoder`, a=0 … e=4) pour tous les modèles : XGBoost
+  l'exige, et l'ordre des grades sert à mesurer la gravité des erreurs.
+- Boosting contre forêt : +0,03, soit 4 à 5 écarts-types. Le gain est réel.
+- Réglage Optuna de LightGBM seul (30 essais, 3 plis, MedianPruner) : 10,9 min réelles
+  contre 5 estimées, car l'estimation ignorait l'effet de `num_leaves` sur la taille des
+  arbres. Gain de +0,007, sous le seuil de 2 écarts-types (0,020), pour un modèle 16 fois
+  plus gros. On garde les réglages par défaut.
+- Test regardé une seule fois, pour les 6 modèles : écarts CV/test ≤ 0,005.
+- La latence unitaire (6 à 11 ms) est dominée par la préparation. Elle ne départage pas
+  les boosters.
+
+**Erreurs analysées**
+
+- 574 erreurs sur 5 965, dont 89 % à une lettre près et 11 produits à 3 lettres ou plus.
+- Classe la plus difficile : B (rappel 0,77), qui part autant vers A que vers C. Elle est
+  rare, au milieu de l'échelle et couvre une bande étroite du score (1 à 2).
+- Pire rayon : alcools (accuracy 0,70 sur 10 produits), hors périmètre du Nutri-Score.
+- Sur 5 produits hésitants entre B et C : 1 limite du modèle (œufs de cailles, score 2),
+  1 règle métier absente (yaourt à boire noté avec la grille boissons), 3 fiches fausses
+  ou douteuses (bière, avoine préparée, pastilles).
+- Le rayon ne suffit pas à repérer les boissons : le yaourt à boire est rangé dans les
+  produits laitiers.
+
+**Pour le TP 16**
+
+- Appliquer les 3 règles d'abstention de la note de limites (alcools, boissons,
+  probabilité maximale sous 0,5) avant de prédire les produits sans grade.
+- Le seuil de 0,5 est une proposition, à calibrer.
+- Une feature « boisson / solide » reste la piste principale d'amélioration. Elle
+  déclencherait une révision de l'ADR.
+
