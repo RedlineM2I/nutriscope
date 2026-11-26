@@ -37,7 +37,6 @@ USAGE_RULE = (
 )
 
 def _info(unit: str, description: str, role: str, missing_policy: str) -> dict[str, str]:
-    """Regroupe la description d'une colonne de l'export, reprise dans `schema.json`."""
     return {
         "unit": unit,
         "description": description,
@@ -73,28 +72,16 @@ COLUMN_INFO: dict[str, dict[str, str]] = {
 }
 
 def read_partitioned_parquet(con: DuckDBPyConnection, req: str) -> pd.DataFrame :
-    """Exécute la requête `req` sur la connexion DuckDB et renvoie le résultat en DataFrame."""
     return con.execute(req).df()
 
 def build_select(path: str = PARQUET_CLEAN_BY_FOOD_GROUP, seed: int = SPLIT_SEED,
                  test_size: float = TEST_SIZE) -> str:
-    """Renvoie la requête SQL qui sélectionne les produits exploitables pour prédire le Nutri-Score.
+    """Return the SQL selecting the usable products for Nutri-Score prediction.
 
-    Lit le Parquet partitionné façon Hive (`food_group` vient du nom du dossier) et ne
-    garde que les produits avec un grade a-e, les 7 nutriments clés renseignés et des
-    valeurs cohérentes (sucres <= glucides, saturés <= lipides, énergie > 0). Ajoute
-    trois ratios et la colonne figée `split`, stratifiée sur `nutriscore_grade` : dans
-    chaque grade, les produits sont classés par md5(code || graine) et la première part
-    `test_size` va en test. Le split d'un produit ne dépend que de son code, de son
-    grade et de la graine.
-
-    Args:
-        path: dossier du Parquet partitionné à lire.
-        seed: graine du classement md5.
-        test_size: part de chaque grade envoyée en test.
-
-    Returns:
-        Requête SQL DuckDB prête à être exécutée.
+    Reads the hive-partitioned Parquet (food_group comes from the folder name).
+    Adds the frozen `split` column, stratified on nutriscore_grade: within each grade,
+    products are ranked by md5(code || seed) and the first `test_size` share goes to test.
+    A product's split only depends on its code, its grade and the seed.
     """
     # Les noms avec un tiret doivent être entre guillemets doubles en SQL.
     q = {n: f'"{n}"' for n in KEY_NUTRIENTS}
@@ -129,16 +116,7 @@ def build_select(path: str = PARQUET_CLEAN_BY_FOOD_GROUP, seed: int = SPLIT_SEED
     """
 
 def check_success(folder: str = PARQUET_CLEAN_BY_FOOD_GROUP) -> None:
-    """Vérifie que le dossier partitionné a son marqueur `_SUCCESS`.
-
-    Un dossier sans marqueur est le reste d'une écriture incomplète : on refuse de le lire.
-
-    Args:
-        folder: dossier partitionné à vérifier.
-
-    Raises:
-        FileNotFoundError: le marqueur `_SUCCESS` est absent.
-    """
+    """Refuse de lire un dossier partitionné sans marqueur `_SUCCESS` (écriture incomplète)."""
     if not (Path(folder) / SUCCESS_MARKER).exists():
         raise FileNotFoundError(
             f"Parquet partitionné incomplet ou absent ({folder}, pas de {SUCCESS_MARKER}) : "
@@ -149,19 +127,9 @@ def write_parquet(force: bool = False, source: str | None = None,
                   export_dir: Path = EXPORTS_DIR) -> Path:
     """Écrit l'export features du jour, avec sa colonne `split`.
 
-    L'écriture se fait sur un seul thread DuckDB : la même source donne les mêmes octets.
-
-    Args:
-        force: réécrit l'export du jour s'il existe déjà.
-        source: dossier partitionné à lire (par défaut : le plus récent qui a son `_SUCCESS`).
-        export_dir: dossier où écrire l'export.
-
-    Returns:
-        Chemin du fichier écrit.
-
-    Raises:
-        FileNotFoundError: le dossier source n'a pas de marqueur `_SUCCESS`.
-        FileExistsError: l'export du jour existe déjà et `force` est faux.
+    :param force: réécrit l'export du jour s'il existe déjà (sinon FileExistsError)
+    :param source: dossier partitionné à lire (par défaut : le plus récent qui a son `_SUCCESS`)
+    :return: chemin du fichier écrit
     """
     if source is None:
         source = str(latest_partitioned())
@@ -183,17 +151,7 @@ def write_parquet(force: bool = False, source: str | None = None,
     return path
 
 def _split_counts(con: DuckDBPyConnection, file: str) -> dict[str, dict]:
-    """Compte les effectifs train / test et la part de test de chaque grade.
-
-    Les effectifs sont relus dans le fichier écrit, pas recalculés.
-
-    Args:
-        con: connexion DuckDB.
-        file: chemin (format POSIX) de l'export à relire.
-
-    Returns:
-        Pour chaque grade, `train`, `test` et `test_share` (arrondie à 4 décimales).
-    """
+    """Effectifs train / test et part de test pour chaque grade, relus dans le fichier écrit."""
     rows = con.execute(f"""
         SELECT nutriscore_grade,
                count(*) FILTER (WHERE split = 'train') AS train,
@@ -207,19 +165,7 @@ def _split_counts(con: DuckDBPyConnection, file: str) -> dict[str, dict]:
     }
 
 def build_schema(path: Path) -> int:
-    """Écrit `schema.json` à côté de l'export.
-
-    Le schéma décrit l'export pour la phase 4 : date de gel, commit Git, empreinte
-    SHA-256, filtres appliqués, distribution de la cible, méthode et effectifs du
-    split, règle d'usage et, pour chaque colonne, son type, son taux de manquants et
-    sa description (`COLUMN_INFO`).
-
-    Args:
-        path: export features à décrire.
-
-    Returns:
-        Nombre de lignes du fichier.
-    """
+    """Écrit `schema.json` à côté de l'export. Retourne le nombre de lignes du fichier."""
     con = duckdb.connect()
     file = path.as_posix()
     names_and_types = con.execute(f"""

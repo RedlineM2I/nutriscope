@@ -1,4 +1,3 @@
-"""Connexion à PostgreSQL à partir des variables `POSTGRES_*` du `.env`."""
 import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, Engine
@@ -8,15 +7,9 @@ load_dotenv()
 
 
 def get_engine() -> Engine:
-    """Crée un engine SQLAlchemy à partir des informations de la base PostgreSQL du `.env`.
-
-    `POSTGRES_PORT` vaut 5432 par défaut ; les autres variables sont obligatoires.
-
-    Returns:
-        Engine de connexion à la base.
-
-    Raises:
-        KeyError: une variable `POSTGRES_*` obligatoire est absente.
+    """
+    Crée un engine sqlalchemy à partir des informations de la base postgresql à utiliser dans le '.env'
+    :return: Engine de connexion à la base
     """
     url = (
         f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:"

@@ -31,19 +31,15 @@ SCHEMA_COLUMNS = {
 
 
 def _create_request(source: Path, dest: Path) -> str:
-    """Construit la requête COPY qui convertit le Parquet nettoyé en Parquet partitionné.
+    """
+    Construit la requête COPY qui convertit le Parquet nettoyé en Parquet partitionné.
 
     Chaque colonne est castée vers le type le plus compact possible (voir `SCHEMA_COLUMNS`),
     la marque est réduite au premier élément de `brands_tags`, les additifs sont comptés
     et `last_modified_t` passe d'un epoch en secondes à un TIMESTAMP.
     Les lignes sont triées par code : deux conversions écrivent les mêmes octets.
 
-    Args:
-        source: Parquet nettoyé à lire.
-        dest: dossier du Parquet partitionné à écrire.
-
-    Returns:
-        Requête SQL DuckDB prête à être exécutée.
+    :return: Requête SQL DuckDB prête à être exécutée
     """
     columns = [
         "CAST(code AS VARCHAR) AS code",
@@ -70,14 +66,14 @@ def _create_request(source: Path, dest: Path) -> str:
     """
 
 def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
-    """Écrit le schéma du dataset partitionné au format JSON.
+    """
+    Écrit le schéma du dataset partitionné au format JSON.
 
     Le fichier contient la clé de partition, la compression, le nombre de lignes,
     la licence et, pour chaque colonne, son type et la raison de ce choix.
 
-    Args:
-        n_rows: nombre de lignes du dataset partitionné.
-        path: chemin du fichier JSON à écrire (créé avec ses dossiers parents si besoin).
+    :param n_rows: Nombre de lignes du dataset partitionné
+    :param path: Chemin du fichier JSON à écrire (créé avec ses dossiers parents si besoin)
     """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)   # ← évite le plantage
@@ -91,18 +87,14 @@ def write_schema(n_rows: int, path=SCHEMA_PRODUIT_JSON):
     p.write_text(json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def convert_parquet(source: Path, dest: Path) -> int:
-    """Convertit le Parquet nettoyé `source` en dataset `dest` partitionné par food_group.
+    """
+    Convertit le Parquet nettoyé `source` en dataset `dest` partitionné par food_group.
 
     Le dossier de sortie est supprimé avant l'écriture pour que la conversion soit
     rejouable sans laisser de partition orpheline. Le marqueur `_SUCCESS` est écrit
     en dernier : un dossier sans marqueur est le reste d'une exécution interrompue.
 
-    Args:
-        source: Parquet nettoyé à convertir.
-        dest: dossier du dataset partitionné à écrire.
-
-    Returns:
-        Nombre de lignes relues dans le dataset partitionné.
+    :return: Nombre de lignes relues dans le dataset partitionné
     """
     if dest.exists():
         shutil.rmtree(dest)  # rejouable, pas de partition orpheline

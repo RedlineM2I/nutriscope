@@ -1,7 +1,3 @@
-"""Tests des fonctions d'analyse exploratoire (src/eda_lib.py).
-
-Chaque fonction est testée sur de petites séries ou DataFrames synthétiques aux valeurs connues.
-"""
 import numpy as np
 import pandas as pd
 

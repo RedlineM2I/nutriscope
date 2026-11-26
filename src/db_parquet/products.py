@@ -1,4 +1,3 @@
-"""Lecture des produits Open Food Facts : figeage du brut et aplatissement des nutriments."""
 from duckdb import DuckDBPyConnection
 
 from pathlib import Path
@@ -10,18 +9,11 @@ import duckdb
 
 
 def extract_products(conn: DuckDBPyConnection, source: Path) -> pd.DataFrame:
-    """Extrait les produits du parquet brut, nutriments aplatis.
-
-    Le nom du produit est pris en français, sinon dans la langue principale,
-    sinon en anglais. Les nutriments clés deviennent une colonne chacun ; les
-    autres restent dans la liste `nutriments_secondaires`.
-
-    Args:
-        conn: connexion à la base DuckDB.
-        source: Parquet brut du périmètre (sortie de l'étape download).
-
-    Returns:
-        DataFrame des produits.
+    """
+    Extrait les produits du parquet brut, nutriments aplatis
+    :param conn: Connexion à la base DuckDB
+    :param source: Parquet brut du périmètre (sortie de l'étape download)
+    :return: Dataframe des produits
     """
     query = f"""
         SELECT
@@ -72,18 +64,10 @@ def extract_products(conn: DuckDBPyConnection, source: Path) -> pd.DataFrame:
 
 
 def get_products_from(source: Path, dest: Path, country: str) -> int:
-    """Fige le brut du périmètre : colonnes utiles des produits vendus dans le pays, triés par code.
-
-    Le code-barres est écrit en texte (zéros de tête conservés). L'écriture se
-    fait sur un seul thread pour obtenir les mêmes octets à chaque exécution.
-
-    Args:
-        source: Parquet Open Food Facts complet.
-        dest: Parquet du brut figé à écrire.
-        country: tag pays à conserver (ex. `'en:france'`).
-
-    Returns:
-        Nombre de produits écrits.
+    """
+    Fige le brut du périmètre : colonnes utiles des produits vendus dans le pays, triés par code.
+    Le code-barres est écrit en texte (zéros de tête conservés).
+    :return: Nombre de produits écrits
     """
     columns = ["CAST(code AS VARCHAR) AS code" if c == "code" else c for c in COLUMNS]
     dest.parent.mkdir(parents=True, exist_ok=True)
