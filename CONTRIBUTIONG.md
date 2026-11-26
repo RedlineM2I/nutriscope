@@ -28,3 +28,10 @@ Exemples :
 - `docs: complète le guide de contribution`
 
 Les messages de commit sont écrits en français
+
+
+## Convention de nommage des Issues dans le Kanban
+
+TP[nb]-[Fonctionnalité] (en français)
+
+ex: TP21 - Migration du LLM vers LangChain
