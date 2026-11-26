@@ -1,4 +1,3 @@
-"""Téléchargement du parquet Open Food Facts depuis Hugging Face, avec vérification SHA-256."""
 import hashlib
 import urllib.error
 import urllib.request
@@ -15,24 +14,15 @@ CHUNK_SIZE = 1024 * 1024
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Gestionnaire qui refuse de suivre les redirections HTTP.
-
-    Permet de lire les en-têtes de la réponse 302 elle-même (dont `X-Linked-Etag`).
-    """
-
     def redirect_request(self, *args, **kwargs):
-        """Renvoie None : la redirection n'est pas suivie et lève une `HTTPError`."""
         return None
 
 
 def expected_sha256() -> str | None:
-    """Renvoie le SHA-256 publié par Hugging Face pour le parquet.
-
-    Il est lu dans l'en-tête `X-Linked-Etag` de la redirection vers le stockage
-    des gros fichiers (LFS).
-
-    Returns:
-        Empreinte attendue, ou None si Hugging Face ne la fournit pas.
+    """
+    SHA-256 publié par Hugging Face : en-tête X-Linked-Etag de la redirection
+    vers le stockage des gros fichiers (LFS).
+    :return: empreinte attendue, ou None si Hugging Face ne la fournit pas
     """
     opener = urllib.request.build_opener(_NoRedirect)
     try:
@@ -44,14 +34,11 @@ def expected_sha256() -> str | None:
 
 
 def download():
-    """Télécharge le fichier parquet depuis l'URL et affiche une barre de progression.
-
-    Le fichier est écrit dans `PART`, vérifié (SHA-256), puis renommé en `DEST` :
-    `DEST` n'est jamais un fichier incomplet ou corrompu.
-
-    Raises:
-        RuntimeError: l'empreinte du fichier téléchargé ne correspond pas à celle
-            publiée (le fichier `PART` est alors supprimé).
+    """
+    Télécharge le fichier parquet depuis l'url et affiche une barre de progression.
+    Le fichier est écrit dans PART, vérifié (SHA-256), puis renommé en DEST : DEST
+    n'est jamais un fichier incomplet ou corrompu.
+    :return:
     """
     DEST.parent.mkdir(parents=True, exist_ok=True)
     expected = expected_sha256()

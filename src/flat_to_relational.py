@@ -1,8 +1,3 @@
-"""Mise à plat du Parquet nettoyé en tables temporaires DuckDB (produits et tags).
-
-Les tables temporaires n'existent que dans la connexion qui les crée : la même
-connexion doit ensuite servir à `RelationalReader` et au chargement PostgreSQL.
-"""
 from _duckdb import DuckDBPyConnection
 
 from pathlib import Path
@@ -10,28 +5,16 @@ from pathlib import Path
 from src.config import Tag
 
 class FlatToRelational:
-    """Découpe le Parquet nettoyé en tables temporaires relationnelles.
-
-    Attributes:
-        conn: connexion DuckDB qui porte les tables temporaires.
-        source: Parquet nettoyé à découper.
-    """
 
     def __init__(self, conn: DuckDBPyConnection, source: Path):
-        """Initialise le découpage.
-
-        Args:
-            conn: connexion DuckDB, à partager avec le chargement en base.
-            source: Parquet nettoyé à découper (le même que celui du Parquet
-                partitionné).
-        """
+        """:param source: Parquet nettoyé à découper (le même que celui du Parquet partitionné)"""
         self.conn = conn
         self.source = source
         
     def create_products(self):
-        """Crée la table temporaire `products` à partir du fichier parquet.
-
-        Chaque produit reçoit un identifiant `id` (numéro de ligne).
+        """
+        Crée une table temporaire propre des produits à partir du fichier parquet
+        :return:
         """
         self.conn.sql(f"""
             CREATE OR REPLACE TEMP TABLE products AS
@@ -40,27 +23,24 @@ class FlatToRelational:
         """)
 
     def create_product_relations(self, field: Tag):
-        """Crée une table temporaire des relations entre les produits et un champ de tags.
+        """
+            Crée une table temporaire contenant les relations entre produits et un champ spécifique.
 
-        La méthode effectue les étapes suivantes :
-        1. Sélectionne les id des produits et les noms associés au champ (par
-           exemple 'category'), un nom par ligne (`UNNEST`).
-        2. Attribue avec `DENSE_RANK()` un identifiant unique à chaque nom, dans
-           l'ordre alphabétique.
-        3. Exclut les noms vides ou NULL.
-        4. Exécute la requête sur la connexion DuckDB (table `products` requise,
-           voir `create_products`).
+            :param field: L'objet Tag représentant le champ pour lequel créer la relation.
+            :type field: Tag
 
-        La table temporaire `products_{field.plural}` a les colonnes :
-        - `product_id` : l'id du produit ;
-        - `{field}_id` : l'identifiant unique du nom (ex. `category_id`) ;
-        - `name` : le nom du tag.
+            La méthode effectue les étapes suivantes :
+            1. Crée une requête SQL qui sélectionne les ID des produits et les noms associés à un champ spécifique (par exemple, 'category').
+            2. Utilise `DENSE_RANK()` pour attribuer un identifiant unique à chaque catégorie ordonnées par le nom.
+            3. Filtre les résultats pour exclure les noms vides ou None.
+            4. Exécute la requête SQL sur la connexion DuckDB.
 
-        Cette table donne une relation claire entre les produits et leurs tags,
-        et sert ensuite à construire le référentiel et la table de liaison.
+            La table temporaire 'products_{field.plural}' est créée avec les colonnes suivantes :
+            - product_id: L'ID du produit.
+            - {field}_id: Un identifiant unique attribué à chaque catégorie ordonnées par le nom.
+            - name: Le nom de la catégorie.
 
-        Args:
-            field: champ de tags pour lequel créer la relation.
+            Cette méthode permet d'avoir une relation claire entre les produits et leurs catégories, facilitant les requêtes futures sur ces relations.
         """
         query = f"""
             CREATE OR REPLACE TEMP TABLE products_{field.plural} AS

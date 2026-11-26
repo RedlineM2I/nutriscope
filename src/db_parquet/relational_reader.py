@@ -1,4 +1,3 @@
-"""Lecture des tables temporaires DuckDB sous forme de DataFrames prêts pour PostgreSQL."""
 import pandas as pd
 
 from src.config import Tag
@@ -10,33 +9,15 @@ FOODGROUPS_QUERY = """
 """
 
 class RelationalReader:
-    """Lit les tables temporaires créées par `FlatToRelational`.
-
-    Attributes:
-        conn: connexion DuckDB qui porte les tables temporaires (la même que
-            celle de `FlatToRelational`).
-    """
-
     def __init__(self, conn):
-        """Initialise le lecteur.
-
-        Args:
-            conn: connexion DuckDB qui porte les tables temporaires.
-        """
         self.conn = conn
 
 
     def get_foodgroups(self) -> pd.DataFrame:
-        """Renvoie le référentiel des rayons (`id`, `name`), sans le rayon 'unknown'."""
         return self.conn.sql(f"{FOODGROUPS_QUERY} ORDER BY id").df()
 
 
     def get_products(self) -> pd.DataFrame:
-        """Renvoie la table des produits, catégorie principale et rayon remplacés par leurs ids.
-
-        Returns:
-            DataFrame des produits trié par `id`, avec `last_modified_t` en TIMESTAMP.
-        """
         # Les slugs main_category et food_group sont remplacés par les ids de leurs référentiels
         query = f"""
             WITH categories AS (
@@ -68,14 +49,6 @@ class RelationalReader:
 
 
     def get_tags(self, field: Tag):
-        """Renvoie le référentiel d'un champ de tags (`id`, `name`).
-
-        Args:
-            field: champ de tags à lire.
-
-        Returns:
-            DataFrame du référentiel, trié par `id`.
-        """
         query = f"""
             SELECT DISTINCT {field}_id AS id, name
             FROM products_{field.plural}
@@ -86,14 +59,6 @@ class RelationalReader:
 
 
     def get_product_relations(self, field: Tag):
-        """Renvoie la table de liaison produit -> tag d'un champ.
-
-        Args:
-            field: champ de tags à lire.
-
-        Returns:
-            DataFrame (`product_id`, `<field>_id`), sans doublon.
-        """
         query = f"""
             SELECT DISTINCT product_id, {field}_id
             FROM products_{field.plural};

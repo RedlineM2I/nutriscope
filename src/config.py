@@ -1,9 +1,4 @@
-"""Chemins du projet et constantes métier.
-
-Les chemins datés (`..._{TODAY}`) servent à l'écriture des sorties du jour. Pour
-lire l'entrée d'une étape, passer par `src.outputs` (`latest_raw`, `latest_clean`,
-`latest_partitioned`), qui retombe sur la sortie la plus récente.
-"""
+"""Chemins du projet et constantes métier."""
 
 from enum import StrEnum
 from pathlib import Path
@@ -15,29 +10,29 @@ TODAY = date.today().strftime("%Y%m%d")
 
 # Source brute : le parquet Open Food Facts téléchargé, sauf si la variable
 # d'environnement NUTRISCOPE_SOURCE désigne un autre parquet (échantillon, extrait)
-PARQUET_FILE = BASE_DIR.parent / "data" / "food.parquet"
+PARQUET_FILE = f"{BASE_DIR.parent}/data/food.parquet"
 SOURCE_ENV = "NUTRISCOPE_SOURCE"
-CLEAN_PARQUET_FILE = BASE_DIR.parent / "data" / "food_clean.parquet"
+CLEAN_PARQUET_FILE = f"{BASE_DIR.parent}/data/food_clean.parquet"
 
 # Brut figé du jour (périmètre France) et son manifeste (empreinte de la source)
 RAW_DIR = BASE_DIR.parent / "data" / "raw"
-PARQUET_FR = RAW_DIR / f"food_france_{TODAY}.parquet"
-RAW_MANIFEST = RAW_DIR / f"manifest_{TODAY}.json"
+PARQUET_FR = f"{RAW_DIR}/food_france_{TODAY}.parquet"
+RAW_MANIFEST = f"{RAW_DIR}/manifest_{TODAY}.json"
 
 # Sorties datées du jour (écriture). Pour lire, passer par src.outputs, qui retombe
 # sur la sortie la plus récente quand celle du jour n'existe pas.
 PARQUET_DIR = BASE_DIR.parent / "data" / "parquet"
-PARQUET_CLEAN_DATASET = PARQUET_DIR / f"food_clean_{TODAY}.parquet"
-PARQUET_CLEAN_BY_FOOD_GROUP = PARQUET_DIR / f"products_{TODAY}"
+PARQUET_CLEAN_DATASET = f"{PARQUET_DIR}/food_clean_{TODAY}.parquet"
+PARQUET_CLEAN_BY_FOOD_GROUP = f"{PARQUET_DIR}/products_{TODAY}"
 # Marqueur écrit en dernier dans un dossier partitionné : son absence = écriture incomplète
 SUCCESS_MARKER = "_SUCCESS"
 
-SCHEMA_PRODUIT_JSON = PARQUET_DIR / f"schema_products_{TODAY}.json"
+SCHEMA_PRODUIT_JSON = f"{PARQUET_DIR}/schema_products_{TODAY}.json"
 
 # Journal des durées : une ligne JSON par étape terminée, échecs compris
 PIPELINE_LOG = BASE_DIR.parent / "data" / "logs" / "pipeline.jsonl"
 
-SCRIPT_CREATION = BASE_DIR.parent / "src" / "db_psql" / "create_tables.sql"
+SCRIPT_CREATION = f"{BASE_DIR.parent}/src/db_psql/create_tables.sql"
 
 ELEVATOR = BASE_DIR.parent / "data" / "elevator.mp3"
 
@@ -53,12 +48,6 @@ EXPORT_CLEANING_REPORT = BASE_DIR.parent / "docs" / "data" / "rapport_nettoyage.
 
 
 class Tag(StrEnum):
-    """Champs à tags multiples mis à plat en tables de liaison.
-
-    La valeur (au singulier) sert à nommer les colonnes d'identifiant
-    (`category_id`...) ; `plural` donne le nom des tables et des colonnes
-    sources (`categories_tags`...).
-    """
     CATEGORY = "category"
     ORIGIN = "origin"
     LABEL = "label"
@@ -69,7 +58,7 @@ class Tag(StrEnum):
 
     @property
     def plural(self) -> str:
-        """Renvoie le pluriel du tag, pour nommer tables et colonnes : categories, origins..."""
+        """Nom des tables et des colonnes de tags : categories, origins..."""
 
         if self is Tag.CATEGORY:
             return "categories"

@@ -1,9 +1,3 @@
-"""Stratégie par défaut de traitement des valeurs manquantes, colonne par colonne.
-
-Lue par `cleaning.missing_values_strategy`. Décisions possibles : "keep",
-"flag", "constant:<valeur>", "foodgroup_median", "mode", "drop_column". Chaque
-choix est justifié en commentaire.
-"""
 DEFAULT_STRATEGY = {
     # --- Identité / général ---
     "code": "keep",                          # jamais de manquant normalement, clé du produit
